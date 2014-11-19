@@ -1,16 +1,19 @@
 CC = clang
 PREFIX = /usr/local
 
-.PHONY: all install clean
+SRC = $(wildcard *.m *.c)
+OUT = bin/mobiledevice
 
-all: mobiledevice
+all: bin $(OUT)
 
-mobiledevice: main.m
-	$(CC) -Wall -fobjc-arc -o mobiledevice -framework CoreFoundation -framework Cocoa -framework MobileDevice -F/System/Library/PrivateFrameworks main.m
+bin:
+	mkdir bin/
 
-install: mobiledevice
-	install -d ${PREFIX}/bin
-	install mobiledevice ${PREFIX}/bin
+$(OUT): $(SRC)
+	$(CC) -Wall -fobjc-arc -o $(OUT) -framework MobileDevice -F/System/Library/PrivateFrameworks $(SRC)
 
+.PHONY: clean
 clean:
-	rm -rf mobiledevice
+	rm -r $(OUT)
+	rm -r bin/
+	
