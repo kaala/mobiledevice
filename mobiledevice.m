@@ -350,7 +350,8 @@ void parse_args(NSDictionary *args)
     }
 
     if (!arguments[@"command"]) {
-        output("COMMANDS: [devices|deploy|info|install|uninstall|list|mcinstall|mcuninstall|mclist]");
+        output("COMMANDS: [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
+        output("Detail: https://github.com/kaala/mobiledevice");
         output("");
         exit(EXIT_FAILURE);
     }
