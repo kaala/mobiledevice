@@ -16,4 +16,3 @@ $(OUT): $(SRC)
 clean:
 	rm -r $(OUT)
 	rm -r bin/
-	
