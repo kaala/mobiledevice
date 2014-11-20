@@ -83,3 +83,9 @@ install xxx.ipa
 mc_install xxx.mobileconfig
 sleep 10
 ```
+
+
+#Website
+
+[http://wettags.com](http://wettags.com/donate)
+
