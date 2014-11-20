@@ -19,8 +19,9 @@ enum {
     AMDeviceInterfaceTypeWifi = 2
 };
 
-extern void execute_on_device(struct am_device *device);
+extern void execute_on_device(struct am_device *device,NSString *cmd,NSString *param);
 
+NSOperationQueue *deploy;
 NSMutableSet *devices=nil;
 NSDictionary *arguments=nil;
 struct am_device_notification *notification=NULL;
@@ -122,7 +123,6 @@ NSDictionary *socket_send_xml(int sock,NSDictionary *message)
         socket_send_request(sock, send);
         NSData *recv=socket_receive_response(sock);
         if (recv) {
-            NSLog(@"%@",recv);
             dict=[NSPropertyListSerialization propertyListWithData:recv options:NSPropertyListReadStreamError format:&format error:&error];
         }
     }
@@ -135,6 +135,14 @@ BOOL is_file_exist(NSString *path)
     NSFileManager *fm=[NSFileManager defaultManager];
     BOOL exist=[fm fileExistsAtPath:path isDirectory:&dir];
     return exist;
+}
+
+NSString *read_file(NSString *path)
+{
+    NSStringEncoding encoding=0;
+    NSError *error=nil;
+    NSString *config=[NSString stringWithContentsOfFile:path usedEncoding:&encoding error:&error];
+    return config;
 }
 
 NSString *get_udid(struct am_device *device)
@@ -228,20 +236,43 @@ static void list_mc(struct am_device *device)
     }
 }
 
-void on_device_connect(struct am_device *device,int cookie)
+void add_device_to_queue(struct am_device *device)
 {
-    if (cookie==MASS_DEPLOY_MODE) {
+    NSOperation *operate=[NSBlockOperation blockOperationWithBlock:^{
         @try {
-            NSString *s=get_udid(device);
-            NSString *o=[NSString stringWithFormat:@"CONNECT %@",s];
+            NSString *param=arguments[@"param"];
+            die(!!param,"!PARAM");
+            NSString *config=read_file(param);
+            NSCharacterSet *nl=[NSCharacterSet newlineCharacterSet];
+            NSCharacterSet *sp=[NSCharacterSet whitespaceCharacterSet];
+            NSArray *sequence=[config componentsSeparatedByCharactersInSet:nl];
+            for (NSString *row in sequence) {
+                NSArray *arg=[row componentsSeparatedByCharactersInSet:sp];
+                if (arg.count==2) {
+                    NSString *cmd=arg[0];
+                    NSString *param=arg[1];
+                    execute_on_device(device, cmd, param);
+                }
+            }
+            NSString *udid=get_udid(device);
+            NSString *o=[NSString stringWithFormat:@"COMPLETE %@",udid];
             output(o.UTF8String);
-
-            die(0,"!DEPLOY_NOT_IMPLEMENT");
         }
         @catch (NSException *exception) {
             NSString *o=[exception description];
             output(o.UTF8String);
         }
+    }];
+    [deploy addOperation:operate];
+}
+
+void on_device_connect(struct am_device *device,int cookie)
+{
+    if (cookie==MASS_DEPLOY_MODE) {
+        NSString *s=get_udid(device);
+        NSString *o=[NSString stringWithFormat:@"CONNECT %@",s];
+        output(o.UTF8String);
+        add_device_to_queue(device);
     }
 
     if (cookie==SINGLE_DEVICE_MODE) {
@@ -252,7 +283,9 @@ void on_device_connect(struct am_device *device,int cookie)
         }
         if ([device_udid isEqualToString:udid]) {
             @try {
-                execute_on_device(device);
+                NSString *cmd=arguments[@"command"];
+                NSString *param=arguments[@"param"];
+                execute_on_device(device,cmd,param);
             }
             @catch (NSException *exception) {
                 NSString *o=[exception description];
@@ -312,6 +345,10 @@ void parse_args(NSDictionary *args)
         output(o.UTF8String);
     }
 
+    if ([arguments[@"preview"] boolValue]) {
+        exit(EXIT_SUCCESS);
+    }
+
     if (!arguments[@"command"]) {
         output("COMMANDS: [devices|deploy|info|install|uninstall|list|mcinstall|mcuninstall|mclist]");
         output("");
@@ -333,6 +370,19 @@ void parse_args(NSDictionary *args)
     }
 
     if ([cmd isEqualToString:@"deploy"]){
+        @try {
+            NSString *param=arguments[@"param"];
+            die(!!param,"!PARAM");
+        }
+        @catch (NSException *exception) {
+            NSString *o=[exception description];
+            output(o.UTF8String);
+            exit(EXIT_FAILURE);
+        }
+
+        deploy=[[NSOperationQueue alloc] init];
+        deploy.maxConcurrentOperationCount=5;
+
         register_device_notification(MASS_DEPLOY_MODE);
         CFRunLoopRun();
         unregister_device_notification();
@@ -356,10 +406,11 @@ int main(int argc, const char * argv[]) {
     for (int i=1; i<argc; i++) {
         NSString *obj=[NSString stringWithUTF8String:argv[i]];
         if ([obj hasPrefix:@"-"]) {
-            if ([obj isEqualToString:@"-v"]) {
+            if ([obj isEqualToString:@"-v"] || [obj isEqualToString:@"-verbose"]) {
                 parse[@"verbose"]=@(YES);
-            }else if ([obj isEqualToString:@"-verbose"]) {
+            }else if ([obj isEqualToString:@"-p"] || [obj isEqualToString:@"-preview"]){
                 parse[@"verbose"]=@(YES);
+                parse[@"preview"]=@(YES);
             }else{
                 key=[obj substringFromIndex:1];
             }
@@ -376,12 +427,15 @@ int main(int argc, const char * argv[]) {
     return EXIT_SUCCESS;
 }
 
-void execute_on_device(struct am_device *device)
+void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
 {
-    BOOL exec=NO;
+    if ([cmd isEqualToString:@"sleep"]) {
+        int seconds=[param intValue];
+        sleep(seconds);
+        return;
+    }
 
-    NSString *cmd=arguments[@"command"];
-    NSString *param=arguments[@"param"];
+    BOOL exec=NO;
 
     die(!AMDeviceConnect(device),"!AMDeviceConnect");
     die(AMDeviceIsPaired(device),"!AMDeviceIsPaired");
@@ -421,8 +475,10 @@ void execute_on_device(struct am_device *device)
     die(!AMDeviceDisconnect(device),"!AMDeviceDisconnect");
 
     if (exec) {
-        output("!OK");
+        NSString *o=[NSString stringWithFormat:@"!OK %@",cmd.uppercaseString];
+        output(o.UTF8String);
     }else{
-        die(0, "!NO_SUCH_COMMAND");
+        NSString *o=[NSString stringWithFormat:@"!NO_SUCH_COMMAND %@",cmd.uppercaseString];
+        die(0, o.UTF8String);
     }
 }

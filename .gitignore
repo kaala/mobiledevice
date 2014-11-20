@@ -1,6 +1,8 @@
 .DS_Store
 bin/
 
-*.xcodeproj/
 *.ipa
 *.mobileconfig
+*.mobiledeploy
+
+*.xcodeproj/
