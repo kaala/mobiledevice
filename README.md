@@ -72,11 +72,14 @@ mobiledevice sleep 5
 ```
 
 
-#Deploy Config
+#Deploy Mode
 
+
+Example of a deploy config file
 
 ```
-install xxx.ipa
 uninstall xx.xxx.xxxx
+install xxx.ipa
+mc_install xxx.mobileconfig
 sleep 10
 ```
