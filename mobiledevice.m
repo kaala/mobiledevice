@@ -141,8 +141,8 @@ NSString *read_file(NSString *path)
 {
     NSStringEncoding encoding=0;
     NSError *error=nil;
-    NSString *config=[NSString stringWithContentsOfFile:path usedEncoding:&encoding error:&error];
-    return config;
+    NSString *text=[NSString stringWithContentsOfFile:path usedEncoding:&encoding error:&error];
+    return text;
 }
 
 NSString *get_udid(struct am_device *device)
@@ -186,8 +186,33 @@ static void list_app(struct am_device *device)
         CFDictionaryRef apps;
         die(!AMDeviceLookupApplications(device, 0, &apps), "!AMDeviceLookupApplications\n");
         NSDictionary *dict=CFBridgingRelease(apps);
-        NSString *o=[dict description];
-        output(o.UTF8String);
+        NSMutableArray *row=[NSMutableArray array];
+        if ([arguments[@"verbose"] boolValue]) {
+            NSString *line=[dict description];
+            [row addObject:line];
+        }else{
+            NSArray *arr=[dict allKeys];
+            NSUInteger len=0;
+            for (NSString *k in arr) {
+                len=MAX(len, k.length);
+            }
+            for (NSString *k in arr) {
+                NSDictionary *info=dict[k];
+                NSString *bundle=info[@"CFBundleIdentifier"];
+                bundle=[bundle stringByPaddingToLength:len+4 withString:@" " startingAtIndex:0];
+                NSString *type=info[@"ApplicationType"];
+                type=[type stringByPaddingToLength:12 withString:@" " startingAtIndex:0];
+                NSString *name=info[@"CFBundleDisplayName"];
+                NSString *version=info[@"CFBundleShortVersionString"];
+                NSString *build=info[@"CFBundleVersion"];
+                NSString *line=[NSString stringWithFormat:@"%@%@%@:%@(%@)",bundle,type,name,version,build];
+                [row addObject:line];
+            }
+        }
+        if (row.count) {
+            NSString *o=[row componentsJoinedByString:@"\n"];
+            output(o.UTF8String);
+        }
     }
     @catch (NSException *exception) {
         @throw exception;
@@ -228,8 +253,31 @@ static void list_mc(struct am_device *device)
         int sock=start_service(device,@"com.apple.mobile.MCInstall");
         socket_send_xml(sock, @{ @"RequestType":@"Flush" });
         NSDictionary *dict=socket_send_xml(sock, @{ @"RequestType":@"GetProfileList" });
-        NSString *o=[dict description];
-        output(o.UTF8String);
+        NSMutableArray *row=[NSMutableArray array];
+        if ([arguments[@"verbose"] boolValue]) {
+            NSString *line=[dict description];
+            [row addObject:line];
+        }else{
+            NSArray *arr=dict[@"OrderedIdentifiers"];
+            NSDictionary *meta=dict[@"ProfileMetadata"];
+            NSUInteger len=0;
+            for (NSString *k in arr) {
+                len=MAX(len, k.length);
+            }
+            for (NSString *k in arr) {
+                NSDictionary *info=meta[k];
+                NSString *bundle=k;
+                bundle=[bundle stringByPaddingToLength:len+4 withString:@" " startingAtIndex:0];
+                NSString *org=info[@"PayloadOrganization"];
+                NSString *name=info[@"PayloadDisplayName"];
+                NSString *line=[NSString stringWithFormat:@"%@%@(%@)",bundle,name,org];
+                [row addObject:line];
+            }
+        }
+        if (row.count) {
+            NSString *o=[row componentsJoinedByString:@"\n"];
+            output(o.UTF8String);
+        }
     }
     @catch (NSException *exception) {
         @throw exception;
