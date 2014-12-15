@@ -227,8 +227,10 @@ static void install_mc(struct am_device *device,NSString *mc_path)
         socket_send_xml(sock, @{ @"RequestType":@"Flush" });
         NSData *payload=[NSData dataWithContentsOfFile:mc_path];
         NSDictionary *dict=socket_send_xml(sock, @{ @"RequestType":@"InstallProfile", @"Payload":payload });
-        NSString *o=[dict description];
-        output(o.UTF8String);
+        if ([arguments[@"verbose"] boolValue]) {
+            NSString *o=[dict description];
+            output(o.UTF8String);
+        }
     }
     @catch (NSException *exception) {
         @throw exception;
@@ -240,8 +242,10 @@ static void uninstall_mc(struct am_device *device, NSString *mc_id)
         int sock=start_service(device,@"com.apple.mobile.MCInstall");
         socket_send_xml(sock, @{ @"RequestType":@"Flush" });
         NSDictionary *dict=socket_send_xml(sock, @{ @"RequestType":@"RemoveProfile", @"ProfileIdentifier":mc_id });
-        NSString *o=[dict description];
-        output(o.UTF8String);
+        if ([arguments[@"verbose"] boolValue]) {
+            NSString *o=[dict description];
+            output(o.UTF8String);
+        }
     }
     @catch (NSException *exception) {
         @throw exception;
@@ -297,9 +301,15 @@ void add_device_to_queue(struct am_device *device)
             for (NSString *row in sequence) {
                 NSArray *arg=[row componentsSeparatedByCharactersInSet:sp];
                 if (arg.count==2) {
-                    NSString *cmd=arg[0];
-                    NSString *param=arg[1];
-                    execute_on_device(device, cmd, param);
+                    @try {
+                        NSString *cmd=arg[0];
+                        NSString *param=arg[1];
+                        execute_on_device(device, cmd, param);
+                    }
+                    @catch (NSException *exception) {
+                        NSString *o=[exception description];
+                        output(o.UTF8String);
+                    }
                 }
             }
             NSString *udid=get_udid(device);
@@ -484,50 +494,48 @@ void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
         return;
     }
 
-    BOOL exec=NO;
-
     die(!AMDeviceConnect(device),"!AMDeviceConnect");
     die(AMDeviceIsPaired(device),"!AMDeviceIsPaired");
     die(!AMDeviceValidatePairing(device),"!AMDeviceValidatePairing");
     die(!AMDeviceStartSession(device),"!AMDeviceStartSession");
 
-    if ([cmd isEqualToString:@"install"]) {
-        die(!!param,"!PARAM");
-        install_app(device, param);
-        exec=YES;
+    NSException *exc=nil;
+    @try {
+        if ([cmd isEqualToString:@"install"]) {
+            die(!!param,"!PARAM");
+            install_app(device, param);
+        }
+        if ([cmd isEqualToString:@"uninstall"]) {
+            die(!!param,"!PARAM");
+            uninstall_app(device, param);
+        }
+        if ([cmd isEqualToString:@"list"]) {
+            list_app(device);
+        }
+        if ([cmd isEqualToString:@"mc_install"]) {
+            die(!!param,"!PARAM");
+            install_mc(device, param);
+        }
+        if ([cmd isEqualToString:@"mc_uninstall"]) {
+            die(!!param,"!PARAM");
+            uninstall_mc(device, param);
+        }
+        if ([cmd isEqualToString:@"mc_list"]) {
+            list_mc(device);
+        }
     }
-    if ([cmd isEqualToString:@"uninstall"]) {
-        die(!!param,"!PARAM");
-        uninstall_app(device, param);
-        exec=YES;
-    }
-    if ([cmd isEqualToString:@"list"]) {
-        list_app(device);
-        exec=YES;
-    }
-    if ([cmd isEqualToString:@"mc_install"]) {
-        die(!!param,"!PARAM");
-        install_mc(device, param);
-        exec=YES;
-    }
-    if ([cmd isEqualToString:@"mc_uninstall"]) {
-        die(!!param,"!PARAM");
-        uninstall_mc(device, param);
-        exec=YES;
-    }
-    if ([cmd isEqualToString:@"mc_list"]) {
-        list_mc(device);
-        exec=YES;
+    @catch (NSException *exception) {
+        exc=exception;
     }
 
     die(!AMDeviceStopSession(device),"!AMDeviceStopSession");
     die(!AMDeviceDisconnect(device),"!AMDeviceDisconnect");
 
-    if (exec) {
+    if (exc) {
+        NSString *o=[exc description];
+        die(0, o.UTF8String);
+    }else{
         NSString *o=[NSString stringWithFormat:@"!OK %@",cmd.uppercaseString];
         output(o.UTF8String);
-    }else{
-        NSString *o=[NSString stringWithFormat:@"!NO_SUCH_COMMAND %@",cmd.uppercaseString];
-        die(0, o.UTF8String);
     }
 }
