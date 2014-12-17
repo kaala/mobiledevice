@@ -40,13 +40,17 @@ void output(const char* s)
     }
 }
 
+NSException *exc(const char* s)
+{
+    NSString *str=[NSString stringWithUTF8String:s];
+    return [NSException exceptionWithName:NSGenericException reason:str userInfo:nil];
+}
+
 void die(int c,const char* s)
 {
     if (!c)
     {
-        NSString *str=[NSString stringWithUTF8String:s];
-        NSException *e=[NSException exceptionWithName:NSGenericException reason:str userInfo:nil];
-        @throw e;
+        @throw exc(s);
     }
 }
 
@@ -155,7 +159,7 @@ NSString *get_udid(struct am_device *device)
 static void install_app(struct am_device *device,NSString* app_path)
 {
     @try {
-        die(is_file_exist(app_path), "!FILE_NOT_EXIST");
+        die(is_file_exist(app_path), "!FILE_NOT_FOUND");
         NSURL *file_url=[NSURL fileURLWithPath:app_path];
         NSDictionary *dict=@{ @"PackageType" : @"Developer" };
         CFURLRef local_app_url=CFBridgingRetain(file_url);
@@ -222,7 +226,7 @@ static void list_app(struct am_device *device)
 static void install_mc(struct am_device *device,NSString *mc_path)
 {
     @try {
-        die(is_file_exist(mc_path), "!FILE_NOT_EXIST");
+        die(is_file_exist(mc_path), "!FILE_NOT_FOUND");
         int sock=start_service(device,@"com.apple.mobile.MCInstall");
         socket_send_xml(sock, @{ @"RequestType":@"Flush" });
         NSData *payload=[NSData dataWithContentsOfFile:mc_path];
@@ -313,7 +317,7 @@ void add_device_to_queue(struct am_device *device)
                 }
             }
             NSString *udid=get_udid(device);
-            NSString *o=[NSString stringWithFormat:@"COMPLETE %@",udid];
+            NSString *o=[NSString stringWithFormat:@"DONE %@",udid];
             output(o.UTF8String);
         }
         @catch (NSException *exception) {
@@ -451,7 +455,7 @@ void parse_args(NSDictionary *args)
 
     if (cmd){
         register_device_notification(SINGLE_DEVICE_MODE);
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 20, NO);
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 5, NO);
         unregister_device_notification();
 
         output("!DEVICE_NOT_FOUND");
@@ -499,40 +503,46 @@ void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
     die(!AMDeviceValidatePairing(device),"!AMDeviceValidatePairing");
     die(!AMDeviceStartSession(device),"!AMDeviceStartSession");
 
-    NSException *exc=nil;
+    NSException *e=exc("!COMMAND_NOT_FOUND");
     @try {
         if ([cmd isEqualToString:@"install"]) {
+            e=nil;
             die(!!param,"!PARAM");
             install_app(device, param);
         }
         if ([cmd isEqualToString:@"uninstall"]) {
+            e=nil;
             die(!!param,"!PARAM");
             uninstall_app(device, param);
         }
         if ([cmd isEqualToString:@"list"]) {
+            e=nil;
             list_app(device);
         }
         if ([cmd isEqualToString:@"mc_install"]) {
+            e=nil;
             die(!!param,"!PARAM");
             install_mc(device, param);
         }
         if ([cmd isEqualToString:@"mc_uninstall"]) {
+            e=nil;
             die(!!param,"!PARAM");
             uninstall_mc(device, param);
         }
         if ([cmd isEqualToString:@"mc_list"]) {
+            e=nil;
             list_mc(device);
         }
     }
     @catch (NSException *exception) {
-        exc=exception;
+        e=exception;
     }
 
     die(!AMDeviceStopSession(device),"!AMDeviceStopSession");
     die(!AMDeviceDisconnect(device),"!AMDeviceDisconnect");
 
-    if (exc) {
-        NSString *o=[exc description];
+    if (e) {
+        NSString *o=[e description];
         die(0, o.UTF8String);
     }else{
         NSString *o=[NSString stringWithFormat:@"!OK %@",cmd.uppercaseString];
