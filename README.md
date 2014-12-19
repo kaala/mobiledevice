@@ -3,7 +3,7 @@
 **Massive Apple Device Configuration CLI Utility**
 
 Apple Configurator alternative
-
+Thanks to [https://github.com/imkira/mobiledevice.git](https://github.com/imkira/mobiledevice.git)
 
 #Manual
 
