@@ -160,7 +160,7 @@ static void install_app(struct am_device *device,NSString* app_path)
 {
     @try {
         die(is_file_exist(app_path), "!FILE_NOT_FOUND");
-        NSURL *file_url=[NSURL fileURLWithPath:app_path];
+        NSURL *file_url=[NSURL fileURLWithPath:app_path isDirectory:YES];
         NSDictionary *dict=@{ @"PackageType" : @"Developer" };
         CFURLRef local_app_url=CFBridgingRetain(file_url);
         CFDictionaryRef options = CFBridgingRetain(dict);
@@ -413,7 +413,7 @@ void parse_args(NSDictionary *args)
 
     if (!arguments[@"command"]) {
         output("COMMANDS: [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
-        output("Detail: https://github.com/kaala/mobiledevice");
+        output("INFO: https://github.com/kaala/mobiledevice");
         output("");
         exit(EXIT_FAILURE);
     }
@@ -486,7 +486,13 @@ int main(int argc, const char * argv[]) {
             }
         }
     }
+
+#ifdef DEBUG
+    NSDictionary *dict=@{};
+    parse=[NSMutableDictionary dictionaryWithDictionary:dict];
+#endif
     parse_args(parse);
+
     return EXIT_SUCCESS;
 }
 
