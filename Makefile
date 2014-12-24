@@ -2,12 +2,9 @@ CC = clang
 PREFIX = /usr/local
 
 SRC = $(wildcard *.m *.c)
-OUT = bin/mobiledevice
+OUT = mobiledevice
 
-all: bin $(OUT)
-
-bin:
-	mkdir bin/
+all: $(OUT)
 
 $(OUT): $(SRC)
 	$(CC) -Wall -fobjc-arc -o $(OUT) -framework MobileDevice -F/System/Library/PrivateFrameworks $(SRC)
@@ -15,4 +12,3 @@ $(OUT): $(SRC)
 .PHONY: clean
 clean:
 	rm -r $(OUT)
-	rm -r bin/
