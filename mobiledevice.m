@@ -412,7 +412,7 @@ void parse_args(NSDictionary *args)
     }
 
     if (!arguments[@"command"]) {
-        output("COMMANDS: [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
+        output("COMMAND: [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
         output("INFO: https://github.com/kaala/mobiledevice");
         output("");
         exit(EXIT_FAILURE);
@@ -486,11 +486,6 @@ int main(int argc, const char * argv[]) {
             }
         }
     }
-
-#ifdef DEBUG
-    NSDictionary *dict=@{};
-    parse=[NSMutableDictionary dictionaryWithDictionary:dict];
-#endif
     parse_args(parse);
 
     return EXIT_SUCCESS;
@@ -498,12 +493,6 @@ int main(int argc, const char * argv[]) {
 
 void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
 {
-    if ([cmd isEqualToString:@"sleep"]) {
-        int seconds=[param intValue];
-        sleep(seconds);
-        return;
-    }
-
     die(!AMDeviceConnect(device),"!AMDeviceConnect");
     die(AMDeviceIsPaired(device),"!AMDeviceIsPaired");
     die(!AMDeviceValidatePairing(device),"!AMDeviceValidatePairing");
@@ -511,6 +500,13 @@ void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
 
     NSException *e=exc("!COMMAND_NOT_FOUND");
     @try {
+        if ([cmd isEqualToString:@"sleep"]) {
+            e=nil;
+            die(!!param,"!PARAM");
+            int seconds=[param intValue];
+            sleep(seconds);
+        }
+
         if ([cmd isEqualToString:@"install"]) {
             e=nil;
             die(!!param,"!PARAM");
@@ -543,15 +539,14 @@ void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
     @catch (NSException *exception) {
         e=exception;
     }
+    if (e) {
+        NSString *o=[e description];
+        die(0, o.UTF8String);
+    }
 
     die(!AMDeviceStopSession(device),"!AMDeviceStopSession");
     die(!AMDeviceDisconnect(device),"!AMDeviceDisconnect");
 
-    if (e) {
-        NSString *o=[e description];
-        die(0, o.UTF8String);
-    }else{
-        NSString *o=[NSString stringWithFormat:@"!OK %@",cmd.uppercaseString];
-        output(o.UTF8String);
-    }
+    NSString *o=[NSString stringWithFormat:@"!OK %@",cmd.uppercaseString];
+    output(o.UTF8String);
 }
