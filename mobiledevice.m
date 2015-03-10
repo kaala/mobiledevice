@@ -57,33 +57,29 @@ void die(int c,const char* s)
 int start_service(struct am_device *device,NSString *service)
 {
     int sock=0;
-    CFStringRef name=CFBridgingRetain(service);
+    CFStringRef name=(__bridge CFStringRef)(service);
     die(!AMDeviceStartService(device,name, &sock), "!AMDeviceStartService");
-    CFBridgingRelease(name);
     return sock;
 }
 
 BOOL socket_send_request(int service,NSData *message)
 {
     bool result = NO;
-    CFDataRef messageAsXML = CFBridgingRetain(message);
+    CFDataRef messageAsXML = (__bridge CFDataRef)(message);
     if (messageAsXML) {
         CFIndex xmlLength = CFDataGetLength(messageAsXML);
         int sock = service;
         uint32_t sz;
         sz = htonl(xmlLength);
         if (send(sock, &sz, sizeof(sz), 0) != sizeof(sz)) {
-            output("!SOCKET_SEND_SIZE");//Can't send message size
+            output("!SOCKET_SEND_SIZE");
         } else {
             if (send(sock, CFDataGetBytePtr(messageAsXML), xmlLength,0) != xmlLength) {
-                output("!SOCKET_SEND_TEXT");//Can't send message text
+                output("!SOCKET_SEND_TRUNCATED");
             } else {
                 result = YES;
             }
         }
-        CFBridgingRelease(messageAsXML);
-    } else {
-        output("!SOCKET_SEND_CONVERTXML");//Can't convert request to XML
     }
     return result;
 }
@@ -93,7 +89,7 @@ NSData *socket_receive_response(int service)
     int sock = service;
     uint32_t sz;
     if (sizeof(uint32_t) != recv(sock, &sz, sizeof(sz), 0)) {
-        output("!SOCKET_RECV_SIZE");//Can't receive reply size
+        output("!SOCKET_RECV_SIZE");
     } else {
         sz = ntohl(sz);
         if (sz) {
@@ -103,9 +99,7 @@ NSData *socket_receive_response(int service)
             while (left) {
                 long rc =recv(sock, p, left,0);
                 if (rc==0) {
-                    output("!SOCKET_RECV_TRUNCATED");//Reply was truncated, expected %d more bytes
-                    free(buff);
-                    return(nil);
+                    output("!SOCKET_RECV_TRUNCATED");
                 }
                 left -= rc;
                 p += rc;
@@ -119,12 +113,14 @@ NSData *socket_receive_response(int service)
 NSDictionary *socket_send_xml(int sock,NSDictionary *message)
 {
     NSDictionary *dict=nil;
+    NSData *recv=nil;
     if (message) {
         NSError *error=nil;
         NSPropertyListFormat format=NSPropertyListXMLFormat_v1_0;
         NSData *send=[NSPropertyListSerialization dataWithPropertyList:message format:format options:NSPropertyListWriteStreamError error:&error];
-        socket_send_request(sock, send);
-        NSData *recv=socket_receive_response(sock);
+        if (socket_send_request(sock, send)) {
+            recv=socket_receive_response(sock);
+        }
         if (recv) {
             dict=[NSPropertyListSerialization propertyListWithData:recv options:NSPropertyListReadStreamError format:&format error:&error];
         }
@@ -151,7 +147,8 @@ NSString *read_file(NSString *path)
 NSString *get_udid(struct am_device *device)
 {
     CFStringRef identifier=AMDeviceCopyDeviceIdentifier(device);
-    NSString *udid=CFBridgingRelease(identifier);
+    NSString *udid=(__bridge NSString *)(identifier);
+    CFRelease(identifier);
     return udid;
 }
 
@@ -161,12 +158,10 @@ static void install_app(struct am_device *device,NSString* app_path)
         die(is_file_exist(app_path), "!FILE_NOT_FOUND");
         NSURL *file_url=[NSURL fileURLWithPath:app_path isDirectory:YES];
         NSDictionary *dict=@{ @"PackageType" : @"Developer" };
-        CFURLRef local_app_url=CFBridgingRetain(file_url);
-        CFDictionaryRef options = CFBridgingRetain(dict);
+        CFURLRef local_app_url = (__bridge CFURLRef)(file_url);
+        CFDictionaryRef options = (__bridge CFDictionaryRef)(dict);
         die(!AMDeviceSecureTransferPath(0, device, local_app_url, options, NULL, 0), "!AMDeviceSecureTransferPath");
         die(!AMDeviceSecureInstallApplication(0, device, local_app_url, options, NULL, 0), "!AMDeviceSecureInstallApplication");
-        CFBridgingRelease(options);
-        CFBridgingRelease(local_app_url);
     }
     @catch (NSException *exception) {
         @throw exception;
@@ -175,9 +170,8 @@ static void install_app(struct am_device *device,NSString* app_path)
 static void uninstall_app(struct am_device *device,NSString *app_id)
 {
     @try {
-        CFStringRef bundle_id=CFBridgingRetain(app_id);
+        CFStringRef bundle_id=(__bridge CFStringRef)(app_id);
         die(!AMDeviceSecureUninstallApplication(0, device, bundle_id, 0, NULL, 0), "!AMDeviceSecureUninstallApplication");
-        CFBridgingRelease(bundle_id);
     }
     @catch (NSException *exception) {
         @throw exception;
@@ -186,9 +180,10 @@ static void uninstall_app(struct am_device *device,NSString *app_id)
 static void list_app(struct am_device *device)
 {
     @try {
-        CFDictionaryRef apps;
+        CFDictionaryRef apps=NULL;
         die(!AMDeviceLookupApplications(device, 0, &apps), "!AMDeviceLookupApplications\n");
-        NSDictionary *dict=CFBridgingRelease(apps);
+        NSDictionary *dict=(__bridge NSDictionary *)(apps);
+        CFRelease(apps);
         NSMutableArray *row=[NSMutableArray array];
         if ([arguments[@"verbose"] boolValue]) {
             NSString *line=[dict description];
@@ -202,13 +197,13 @@ static void list_app(struct am_device *device)
             for (NSString *k in arr) {
                 NSDictionary *info=dict[k];
                 NSString *bundle=info[@"CFBundleIdentifier"];
-                bundle=[bundle stringByPaddingToLength:len+4 withString:@" " startingAtIndex:0];
+                bundle=[bundle stringByPaddingToLength:len withString:@" " startingAtIndex:0];
                 NSString *type=info[@"ApplicationType"];
                 type=[type stringByPaddingToLength:12 withString:@" " startingAtIndex:0];
                 NSString *name=info[@"CFBundleDisplayName"];
                 NSString *version=info[@"CFBundleShortVersionString"];
                 NSString *build=info[@"CFBundleVersion"];
-                NSString *line=[NSString stringWithFormat:@"%@%@%@:%@(%@)",bundle,type,name,version,build];
+                NSString *line=[NSString stringWithFormat:@"%@    %@ %@ %@(%@)",bundle,type,name,version,build];
                 [row addObject:line];
             }
         }
@@ -266,18 +261,18 @@ static void list_mc(struct am_device *device)
             [row addObject:line];
         }else{
             NSArray *arr=dict[@"OrderedIdentifiers"];
-            NSDictionary *meta=dict[@"ProfileMetadata"];
+            NSDictionary *metadata=dict[@"ProfileMetadata"];
             NSUInteger len=0;
             for (NSString *k in arr) {
                 len=MAX(len, k.length);
             }
             for (NSString *k in arr) {
-                NSDictionary *info=meta[k];
+                NSDictionary *meta=metadata[k];
                 NSString *bundle=k;
-                bundle=[bundle stringByPaddingToLength:len+4 withString:@" " startingAtIndex:0];
-                NSString *org=info[@"PayloadOrganization"];
-                NSString *name=info[@"PayloadDisplayName"];
-                NSString *line=[NSString stringWithFormat:@"%@%@(%@)",bundle,name,org];
+                bundle=[bundle stringByPaddingToLength:len withString:@" " startingAtIndex:0];
+                NSString *name=meta[@"PayloadDisplayName"];
+                NSString *desc=meta[@"PayloadOrganization"];
+                NSString *line=[NSString stringWithFormat:@"%@    %@ (%@)",bundle,name,desc];
                 [row addObject:line];
             }
         }
