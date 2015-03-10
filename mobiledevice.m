@@ -406,9 +406,10 @@ void parse_args(NSDictionary *args)
     }
 
     if (!arguments[@"command"]) {
-        output("COMMAND: [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
-        output("INFO: https://github.com/kaala/mobiledevice");
-        output("");
+        output("CMD:");
+        output(" [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
+        output("INFO:");
+        output(" https://github.com/kaala/mobiledevice");
         exit(EXIT_FAILURE);
     }
 
