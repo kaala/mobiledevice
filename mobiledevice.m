@@ -110,8 +110,7 @@ NSData *socket_receive_response(int service)
                 left -= rc;
                 p += rc;
             }
-            CFDataRef r = CFDataCreateWithBytesNoCopy(0,buff,sz,kCFAllocatorNull);
-            result=CFBridgingRelease(r);
+            result=[NSData dataWithBytes:buff length:sz];
             free(buff);
         }
     }
