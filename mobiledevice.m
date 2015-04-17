@@ -15,269 +15,282 @@
 __DLLIMPORT uint32_t AMDeviceGetInterfaceType(struct am_device *device);
 
 enum {
-    AMDeviceInterfaceTypeUSB = 1,
-    AMDeviceInterfaceTypeWifi = 2
+	AMDeviceInterfaceTypeUSB = 1,
+	AMDeviceInterfaceTypeWifi = 2
 };
 
-extern void execute_on_device(struct am_device *device,NSString *cmd,NSString *param);
+extern void execute_on_device(struct am_device *device, NSString *cmd, NSString *param);
 
 NSOperationQueue *deploy;
-NSMutableSet *devices=nil;
-NSDictionary *arguments=nil;
-struct am_device_notification *notification=NULL;
+NSMutableSet *devices = nil;
+NSDictionary *arguments = nil;
+struct am_device_notification *notification = NULL;
 
 enum {
-    DEVICE_DETECT_MODE,
-    SINGLE_DEVICE_MODE,
-    MASS_DEPLOY_MODE
+	DEVICE_DETECT_MODE,
+	SINGLE_DEVICE_MODE,
+	MASS_DEPLOY_MODE
 };
 
-void output(const char* s)
+void output(const char *s)
 {
-    if (s)
-    {
-        printf("%s\n",s);
-    }
+	if (s) {
+		printf("%s\n", s);
+	}
 }
 
-NSException *exc(const char* s)
+NSException *exc(const char *s)
 {
-    NSString *str=[NSString stringWithUTF8String:s];
-    return [NSException exceptionWithName:NSGenericException reason:str userInfo:nil];
+	NSString *str = [NSString stringWithUTF8String:s];
+	return [NSException exceptionWithName:NSGenericException reason:str userInfo:nil];
 }
 
-void die(int c,const char* s)
+void die(int c, const char *s)
 {
-    if (!c)
-    {
-        @throw exc(s);
-    }
+	if (!c) {
+		@throw exc(s);
+	}
 }
 
-int start_service(struct am_device *device,NSString *service)
+int start_service(struct am_device *device, NSString *service)
 {
-    int sock=0;
-    CFStringRef name=(__bridge CFStringRef)(service);
-    die(!AMDeviceStartService(device,name, &sock), "!AMDeviceStartService");
-    return sock;
+	int sock = 0;
+	CFStringRef name = (__bridge CFStringRef)(service);
+	die(!AMDeviceStartService(device, name, &sock), "!AMDeviceStartService");
+	return sock;
 }
 
-BOOL socket_send_request(int service,NSData *message)
+BOOL socket_send_request(int service, NSData *message)
 {
-    bool result = NO;
-    CFDataRef messageAsXML = (__bridge CFDataRef)(message);
-    if (messageAsXML) {
-        CFIndex xmlLength = CFDataGetLength(messageAsXML);
-        int sock = service;
-        uint32_t sz;
-        sz = htonl(xmlLength);
-        if (send(sock, &sz, sizeof(sz), 0) != sizeof(sz)) {
-            output("!SOCKET_SEND_SIZE");
-        } else {
-            if (send(sock, CFDataGetBytePtr(messageAsXML), xmlLength,0) != xmlLength) {
-                output("!SOCKET_SEND_TRUNCATED");
-            } else {
-                result = YES;
-            }
-        }
-    }
-    return result;
+	bool result = NO;
+	CFDataRef messageAsXML = (__bridge CFDataRef)(message);
+	if (messageAsXML) {
+		CFIndex xmlLength = CFDataGetLength(messageAsXML);
+		int sock = service;
+		uint32_t sz;
+		sz = htonl(xmlLength);
+		if (send(sock, &sz, sizeof(sz), 0) != sizeof(sz)) {
+			output("!SOCKET_SEND_SIZE");
+		} else {
+			if (send(sock, CFDataGetBytePtr(messageAsXML), xmlLength, 0) != xmlLength) {
+				output("!SOCKET_SEND_TRUNCATED");
+			} else {
+				result = YES;
+			}
+		}
+	}
+	return result;
 }
 NSData *socket_receive_response(int service)
 {
-    NSData *result = nil;
-    int sock = service;
-    uint32_t sz;
-    if (sizeof(uint32_t) != recv(sock, &sz, sizeof(sz), 0)) {
-        output("!SOCKET_RECV_SIZE");
-    } else {
-        sz = ntohl(sz);
-        if (sz) {
-            unsigned char *buff = malloc(sz);
-            unsigned char *p = buff;
-            uint32_t left = sz;
-            while (left) {
-                long rc =recv(sock, p, left,0);
-                if (rc==0) {
-                    output("!SOCKET_RECV_TRUNCATED");
-                }
-                left -= rc;
-                p += rc;
-            }
-            result=[NSData dataWithBytes:buff length:sz];
-            free(buff);
-        }
-    }
-    return result;
+	NSData *result = nil;
+	int sock = service;
+	uint32_t sz;
+	if (sizeof(uint32_t) != recv(sock, &sz, sizeof(sz), 0)) {
+		output("!SOCKET_RECV_SIZE");
+	} else {
+		sz = ntohl(sz);
+		if (sz) {
+			unsigned char *buff = malloc(sz);
+			unsigned char *p = buff;
+			uint32_t left = sz;
+			while (left) {
+				long rc = recv(sock, p, left, 0);
+				if (rc == 0) {
+					output("!SOCKET_RECV_TRUNCATED");
+				}
+				left -= rc;
+				p += rc;
+			}
+			result = [NSData dataWithBytes:buff length:sz];
+			free(buff);
+		}
+	}
+	return result;
 }
-NSDictionary *socket_send_xml(int sock,NSDictionary *message)
+NSDictionary *socket_send_xml(int sock, NSDictionary *message)
 {
-    NSDictionary *dict=nil;
-    NSData *recv=nil;
-    if (message) {
-        NSError *error=nil;
-        NSPropertyListFormat format=NSPropertyListXMLFormat_v1_0;
-        NSData *send=[NSPropertyListSerialization dataWithPropertyList:message format:format options:NSPropertyListWriteStreamError error:&error];
-        if (socket_send_request(sock, send)) {
-            recv=socket_receive_response(sock);
-        }
-        if (recv) {
-            dict=[NSPropertyListSerialization propertyListWithData:recv options:NSPropertyListReadStreamError format:&format error:&error];
-        }
-    }
-    return dict;
+	NSDictionary *dict = nil;
+	NSData *recv = nil;
+	if (message) {
+		NSError *error = nil;
+		NSPropertyListFormat format = NSPropertyListXMLFormat_v1_0;
+		NSData *send = [NSPropertyListSerialization dataWithPropertyList:message format:format options:NSPropertyListWriteStreamError error:&error];
+		if (socket_send_request(sock, send)) {
+			recv = socket_receive_response(sock);
+		}
+		if (recv) {
+			dict = [NSPropertyListSerialization propertyListWithData:recv options:NSPropertyListReadStreamError format:&format error:&error];
+		}
+	}
+	return dict;
 }
 
 BOOL is_file_exist(NSString *path)
 {
-    BOOL dir=NO;
-    NSFileManager *fm=[NSFileManager defaultManager];
-    BOOL exist=[fm fileExistsAtPath:path isDirectory:&dir];
-    return exist;
+	BOOL dir = NO;
+	NSFileManager *fm = [NSFileManager defaultManager];
+	BOOL exist = [fm fileExistsAtPath:path isDirectory:&dir];
+	return exist;
 }
 
 NSString *read_file(NSString *path)
 {
-    NSStringEncoding encoding=0;
-    NSError *error=nil;
-    NSString *text=[NSString stringWithContentsOfFile:path usedEncoding:&encoding error:&error];
-    return text;
+	NSStringEncoding encoding = 0;
+	NSError *error = nil;
+	NSString *text = [NSString stringWithContentsOfFile:path usedEncoding:&encoding error:&error];
+	return text;
 }
 
 NSString *get_udid(struct am_device *device)
 {
-    CFStringRef identifier=AMDeviceCopyDeviceIdentifier(device);
-    NSString *udid=(__bridge NSString *)(identifier);
-    CFRelease(identifier);
-    return udid;
+	CFStringRef identifier = AMDeviceCopyDeviceIdentifier(device);
+	NSString *udid = (__bridge NSString *)(identifier);
+	CFRelease(identifier);
+	return udid;
 }
 
-static void install_app(struct am_device *device,NSString* app_path)
+static void install_app(struct am_device *device, NSString *app_path)
 {
-    @try {
-        die(is_file_exist(app_path), "!FILE_NOT_FOUND");
-        NSURL *file_url=[NSURL fileURLWithPath:app_path isDirectory:YES];
-        NSDictionary *dict=@{ @"PackageType" : @"Developer" };
-        CFURLRef local_app_url = (__bridge CFURLRef)(file_url);
-        CFDictionaryRef options = (__bridge CFDictionaryRef)(dict);
-        die(!AMDeviceSecureTransferPath(0, device, local_app_url, options, NULL, 0), "!AMDeviceSecureTransferPath");
-        die(!AMDeviceSecureInstallApplication(0, device, local_app_url, options, NULL, 0), "!AMDeviceSecureInstallApplication");
-    }
-    @catch (NSException *exception) {
-        @throw exception;
-    }
+	@try {
+		die(is_file_exist(app_path), "!FILE_NOT_FOUND");
+		NSURL *file_url = [NSURL fileURLWithPath:app_path isDirectory:YES];
+		NSDictionary *dict = @{ @"PackageType" : @"Developer" };
+		CFURLRef local_app_url = (__bridge CFURLRef)(file_url);
+		CFDictionaryRef options = (__bridge CFDictionaryRef)(dict);
+		die(!AMDeviceSecureTransferPath(0, device, local_app_url, options, NULL, 0), "!AMDeviceSecureTransferPath");
+		die(!AMDeviceSecureInstallApplication(0, device, local_app_url, options, NULL, 0), "!AMDeviceSecureInstallApplication");
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
 }
-static void uninstall_app(struct am_device *device,NSString *app_id)
+static void uninstall_app(struct am_device *device, NSString *app_id)
 {
-    @try {
-        CFStringRef bundle_id=(__bridge CFStringRef)(app_id);
-        die(!AMDeviceSecureUninstallApplication(0, device, bundle_id, 0, NULL, 0), "!AMDeviceSecureUninstallApplication");
-    }
-    @catch (NSException *exception) {
-        @throw exception;
-    }
+	@try {
+		CFStringRef bundle_id = (__bridge CFStringRef)(app_id);
+		die(!AMDeviceSecureUninstallApplication(0, device, bundle_id, 0, NULL, 0), "!AMDeviceSecureUninstallApplication");
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
 }
 static void list_app(struct am_device *device)
 {
-    @try {
-        CFDictionaryRef apps=NULL;
-        die(!AMDeviceLookupApplications(device, 0, &apps), "!AMDeviceLookupApplications\n");
-        NSDictionary *dict=(__bridge NSDictionary *)(apps);
-        CFRelease(apps);
-        NSMutableArray *row=[NSMutableArray array];
-        if ([arguments[@"verbose"] boolValue]) {
-            NSString *line=[dict description];
-            [row addObject:line];
-        }else{
-            NSArray *arr=[dict allKeys];
-            NSUInteger len=0;
-            for (NSString *k in arr) {
-                len=MAX(len, k.length);
-            }
-            for (NSString *k in arr) {
-                NSDictionary *info=dict[k];
-                NSString *bundle=info[@"CFBundleIdentifier"];
-                bundle=[bundle stringByPaddingToLength:len withString:@" " startingAtIndex:0];
-                NSString *type=info[@"ApplicationType"];
-                type=[type stringByPaddingToLength:12 withString:@" " startingAtIndex:0];
-                NSString *name=info[@"CFBundleDisplayName"];
-                NSString *version=info[@"CFBundleShortVersionString"];
-                NSString *build=info[@"CFBundleVersion"];
-                NSString *line=[NSString stringWithFormat:@"%@    %@ %@ %@(%@)",bundle,type,name,version,build];
-                [row addObject:line];
-            }
-        }
-        if (row.count) {
-            NSString *o=[row componentsJoinedByString:@"\n"];
-            output(o.UTF8String);
-        }
-    }
-    @catch (NSException *exception) {
-        @throw exception;
-    }
+	@try {
+		CFDictionaryRef apps = NULL;
+		die(!AMDeviceLookupApplications(device, 0, &apps), "!AMDeviceLookupApplications\n");
+		NSDictionary *dict = (__bridge NSDictionary *)(apps);
+		CFRelease(apps);
+		NSMutableArray *row = [NSMutableArray array];
+		if ([arguments[@"verbose"] boolValue]) {
+			NSString *line = [dict description];
+			[row addObject:line];
+		} else {
+			NSArray *arr = [dict allKeys];
+			NSUInteger len = 0;
+			for (NSString *k in arr) {
+				len = MAX(len, k.length);
+			}
+			for (NSString *k in arr) {
+				NSDictionary *info = dict[k];
+				NSString *bundle = info[@"CFBundleIdentifier"];
+				bundle = [bundle stringByPaddingToLength:len withString:@" " startingAtIndex:0];
+				NSString *type = info[@"ApplicationType"];
+				type = [type stringByPaddingToLength:12 withString:@" " startingAtIndex:0];
+				NSString *name = info[@"CFBundleDisplayName"];
+				NSString *version = info[@"CFBundleShortVersionString"];
+				NSString *build = info[@"CFBundleVersion"];
+				NSString *line = [NSString stringWithFormat:@"%@    %@ %@ %@(%@)", bundle, type, name, version, build];
+				[row addObject:line];
+			}
+		}
+		if (row.count) {
+			NSString *o = [row componentsJoinedByString:@"\n"];
+			output(o.UTF8String);
+		}
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
 }
 
-static void install_mc(struct am_device *device,NSString *mc_path)
+static void install_mc(struct am_device *device, NSString *mc_path)
 {
-    @try {
-        die(is_file_exist(mc_path), "!FILE_NOT_FOUND");
-        int sock=start_service(device,@"com.apple.mobile.MCInstall");
-        socket_send_xml(sock, @{ @"RequestType":@"Flush" });
-        NSData *payload=[NSData dataWithContentsOfFile:mc_path];
-        NSDictionary *dict=socket_send_xml(sock, @{ @"RequestType":@"InstallProfile", @"Payload":payload });
-        if ([arguments[@"verbose"] boolValue]) {
-            NSString *o=[dict description];
-            output(o.UTF8String);
-        }
-    }
-    @catch (NSException *exception) {
-        @throw exception;
-    }
+	@try {
+		die(is_file_exist(mc_path), "!FILE_NOT_FOUND");
+		int sock = start_service(device, @"com.apple.mobile.MCInstall");
+		socket_send_xml(sock, @{ @"RequestType":@"Flush" });
+		NSData *payload = [NSData dataWithContentsOfFile:mc_path];
+		NSDictionary *dict = socket_send_xml(sock, @{ @"RequestType":@"InstallProfile", @"Payload":payload });
+		if ([arguments[@"verbose"] boolValue]) {
+			NSString *o = [dict description];
+			output(o.UTF8String);
+		}
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
 }
 static void uninstall_mc(struct am_device *device, NSString *mc_id)
 {
-    @try {
-        int sock=start_service(device,@"com.apple.mobile.MCInstall");
-        socket_send_xml(sock, @{ @"RequestType":@"Flush" });
-        NSDictionary *dict=socket_send_xml(sock, @{ @"RequestType":@"RemoveProfile", @"ProfileIdentifier":mc_id });
-        if ([arguments[@"verbose"] boolValue]) {
-            NSString *o=[dict description];
-            output(o.UTF8String);
-        }
-    }
-    @catch (NSException *exception) {
-        @throw exception;
-    }
+	@try {
+		int sock = start_service(device, @"com.apple.mobile.MCInstall");
+		socket_send_xml(sock, @{ @"RequestType":@"Flush" });
+		NSDictionary *dict = socket_send_xml(sock, @{ @"RequestType":@"RemoveProfile", @"ProfileIdentifier":mc_id });
+		if ([arguments[@"verbose"] boolValue]) {
+			NSString *o = [dict description];
+			output(o.UTF8String);
+		}
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
 }
 static void list_mc(struct am_device *device)
 {
+	@try {
+		int sock = start_service(device, @"com.apple.mobile.MCInstall");
+		socket_send_xml(sock, @{ @"RequestType":@"Flush" });
+		NSDictionary *dict = socket_send_xml(sock, @{ @"RequestType":@"GetProfileList" });
+		NSMutableArray *row = [NSMutableArray array];
+		if ([arguments[@"verbose"] boolValue]) {
+			NSString *line = [dict description];
+			[row addObject:line];
+		} else {
+			NSArray *arr = dict[@"OrderedIdentifiers"];
+			NSDictionary *metadata = dict[@"ProfileMetadata"];
+			NSUInteger len = 0;
+			for (NSString *k in arr) {
+				len = MAX(len, k.length);
+			}
+			for (NSString *k in arr) {
+				NSDictionary *meta = metadata[k];
+				NSString *bundle = k;
+				bundle = [bundle stringByPaddingToLength:len withString:@" " startingAtIndex:0];
+				NSString *name = meta[@"PayloadDisplayName"];
+				NSString *desc = meta[@"PayloadOrganization"];
+				NSString *line = [NSString stringWithFormat:@"%@    %@ (%@)", bundle, name, desc];
+				[row addObject:line];
+			}
+		}
+		if (row.count) {
+			NSString *o = [row componentsJoinedByString:@"\n"];
+			output(o.UTF8String);
+		}
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
+}
+
+static void shutdown_device(struct am_device *device)
+{
     @try {
-        int sock=start_service(device,@"com.apple.mobile.MCInstall");
-        socket_send_xml(sock, @{ @"RequestType":@"Flush" });
-        NSDictionary *dict=socket_send_xml(sock, @{ @"RequestType":@"GetProfileList" });
-        NSMutableArray *row=[NSMutableArray array];
+        int sock = start_service(device, @"com.apple.mobile.diagnostics_relay");
+        NSDictionary *dict = socket_send_xml(sock, @{ @"Request":@"Shutdown" });
         if ([arguments[@"verbose"] boolValue]) {
-            NSString *line=[dict description];
-            [row addObject:line];
-        }else{
-            NSArray *arr=dict[@"OrderedIdentifiers"];
-            NSDictionary *metadata=dict[@"ProfileMetadata"];
-            NSUInteger len=0;
-            for (NSString *k in arr) {
-                len=MAX(len, k.length);
-            }
-            for (NSString *k in arr) {
-                NSDictionary *meta=metadata[k];
-                NSString *bundle=k;
-                bundle=[bundle stringByPaddingToLength:len withString:@" " startingAtIndex:0];
-                NSString *name=meta[@"PayloadDisplayName"];
-                NSString *desc=meta[@"PayloadOrganization"];
-                NSString *line=[NSString stringWithFormat:@"%@    %@ (%@)",bundle,name,desc];
-                [row addObject:line];
-            }
-        }
-        if (row.count) {
-            NSString *o=[row componentsJoinedByString:@"\n"];
+            NSString *o = [dict description];
             output(o.UTF8String);
         }
     }
@@ -288,260 +301,268 @@ static void list_mc(struct am_device *device)
 
 void add_device_to_queue(struct am_device *device)
 {
-    NSOperation *operate=[NSBlockOperation blockOperationWithBlock:^{
-        @try {
-            NSString *param=arguments[@"param"];
-            die(!!param,"!PARAM");
-            NSString *config=read_file(param);
-            NSCharacterSet *nl=[NSCharacterSet newlineCharacterSet];
-            NSCharacterSet *sp=[NSCharacterSet whitespaceCharacterSet];
-            NSArray *sequence=[config componentsSeparatedByCharactersInSet:nl];
-            for (NSString *row in sequence) {
-                NSArray *arg=[row componentsSeparatedByCharactersInSet:sp];
-                if (arg.count==2) {
-                    @try {
-                        NSString *cmd=arg[0];
-                        NSString *param=arg[1];
-                        execute_on_device(device, cmd, param);
-                    }
-                    @catch (NSException *exception) {
-                        NSString *o=[exception description];
-                        output(o.UTF8String);
-                    }
-                }
-            }
-            NSString *udid=get_udid(device);
-            NSString *o=[NSString stringWithFormat:@"DONE %@",udid];
-            output(o.UTF8String);
-        }
-        @catch (NSException *exception) {
-            NSString *o=[exception description];
-            output(o.UTF8String);
-        }
-    }];
-    [deploy addOperation:operate];
+	NSOperation *operate = [NSBlockOperation blockOperationWithBlock:^{
+	                            @try {
+	                                NSString *param = arguments[@"param"];
+	                                die(!!param, "!PARAM");
+	                                NSString *config = read_file(param);
+	                                NSCharacterSet *nl = [NSCharacterSet newlineCharacterSet];
+	                                NSCharacterSet *sp = [NSCharacterSet whitespaceCharacterSet];
+	                                NSArray *sequence = [config componentsSeparatedByCharactersInSet:nl];
+	                                for (NSString *row in sequence) {
+	                                    NSArray *arg = [row componentsSeparatedByCharactersInSet:sp];
+	                                    if (arg.count == 2) {
+	                                        @try {
+	                                            NSString *cmd = arg[0];
+	                                            NSString *param = arg[1];
+	                                            execute_on_device(device, cmd, param);
+											}
+	                                        @catch (NSException *exception) {
+	                                            NSString *o = [exception description];
+	                                            output(o.UTF8String);
+											}
+										}
+									}
+	                                NSString *udid = get_udid(device);
+	                                NSString *o = [NSString stringWithFormat:@"%@ DEPLOYED", udid];
+	                                output(o.UTF8String);
+								}
+	                            @catch (NSException *exception) {
+	                                NSString *o = [exception description];
+	                                output(o.UTF8String);
+								}
+							}];
+	[deploy addOperation:operate];
 }
 
-void on_device_connect(struct am_device *device,int cookie)
+void on_device_connect(struct am_device *device, int cookie)
 {
-    if (cookie==MASS_DEPLOY_MODE) {
-        NSString *s=get_udid(device);
-        NSString *o=[NSString stringWithFormat:@"CONNECT %@",s];
-        output(o.UTF8String);
-        add_device_to_queue(device);
-    }
+	if (cookie == MASS_DEPLOY_MODE) {
+		NSString *s = get_udid(device);
+		NSString *o = [NSString stringWithFormat:@"%@ CONNECT", s];
+		output(o.UTF8String);
+		add_device_to_queue(device);
+	}
 
-    if (cookie==SINGLE_DEVICE_MODE) {
-        NSString *udid=get_udid(device);
-        NSString *device_udid=arguments[@"udid"];
-        if (!device_udid) {
-            device_udid=udid;
-        }
-        if ([device_udid isEqualToString:udid]) {
-            @try {
-                NSString *cmd=arguments[@"command"];
-                NSString *param=arguments[@"param"];
-                execute_on_device(device,cmd,param);
-            }
-            @catch (NSException *exception) {
-                NSString *o=[exception description];
-                output(o.UTF8String);
-                exit(EXIT_FAILURE);
-            }
-            exit(EXIT_SUCCESS);
-        }
-    }
+	if (cookie == SINGLE_DEVICE_MODE) {
+		NSString *udid = get_udid(device);
+		NSString *device_udid = arguments[@"udid"];
+		if (!device_udid) {
+			device_udid = udid;
+		}
+		if ([device_udid isEqualToString:udid]) {
+			@try {
+				NSString *cmd = arguments[@"command"];
+				NSString *param = arguments[@"param"];
+				execute_on_device(device, cmd, param);
+			}
+			@catch (NSException *exception) {
+				NSString *o = [exception description];
+				output(o.UTF8String);
+				exit(EXIT_FAILURE);
+			}
+			exit(EXIT_SUCCESS);
+		}
+	}
 }
-void on_device_disconnect(struct am_device *device,int cookie)
+void on_device_disconnect(struct am_device *device, int cookie)
 {
-    if (cookie==MASS_DEPLOY_MODE) {
-        NSString *s=get_udid(device);
-        NSString *o=[NSString stringWithFormat:@"DISCONNECT %@",s];
-        output(o.UTF8String);
-    }
+	if (cookie == MASS_DEPLOY_MODE) {
+		NSString *s = get_udid(device);
+		NSString *o = [NSString stringWithFormat:@"%@ DISCONNECT", s];
+		output(o.UTF8String);
+	}
 }
 
 void on_device_notification(struct am_device_notification_callback_info *info, int cookie)
 {
-    struct am_device *device=info->dev;
-    if (AMDeviceGetInterfaceType(device) != AMDeviceInterfaceTypeUSB)
-    {
-        return;
-    }
-    if (info->msg == ADNCI_MSG_CONNECTED)
-    {
-        NSString *s=get_udid(device);
-        [devices addObject:s];
-        on_device_connect(device,cookie);
-    }
-    if (info->msg == ADNCI_MSG_DISCONNECTED)
-    {
-        NSString *s=get_udid(device);
-        [devices removeObject:s];
-        on_device_disconnect(device,cookie);
-    }
+	struct am_device *device = info->dev;
+	if (AMDeviceGetInterfaceType(device) != AMDeviceInterfaceTypeUSB) {
+		return;
+	}
+	if (info->msg == ADNCI_MSG_CONNECTED) {
+		NSString *s = get_udid(device);
+		[devices addObject:s];
+		on_device_connect(device, cookie);
+	}
+	if (info->msg == ADNCI_MSG_DISCONNECTED) {
+		NSString *s = get_udid(device);
+		[devices removeObject:s];
+		on_device_disconnect(device, cookie);
+	}
 }
 
 void register_device_notification(int cookie)
 {
-    AMDeviceNotificationSubscribe(&on_device_notification, 0, 0, cookie, &notification);
+	AMDeviceNotificationSubscribe(&on_device_notification, 0, 0, cookie, &notification);
 }
 void unregister_device_notification()
 {
-    AMDeviceNotificationUnsubscribe(notification);
+	AMDeviceNotificationUnsubscribe(notification);
 }
 
 void parse_args(NSDictionary *args)
 {
-    arguments=args;
-    devices=[NSMutableSet set];
+	arguments = args;
+	devices = [NSMutableSet set];
 
-    if ([arguments[@"verbose"] boolValue]) {
-        NSString *o=[args description];
-        output(o.UTF8String);
-    }
+	if ([arguments[@"verbose"] boolValue]) {
+		NSString *o = [args description];
+		output(o.UTF8String);
+	}
 
-    if ([arguments[@"preview"] boolValue]) {
-        exit(EXIT_SUCCESS);
-    }
+	if ([arguments[@"preview"] boolValue]) {
+		exit(EXIT_SUCCESS);
+	}
 
-    if (!arguments[@"command"]) {
-        output("CMD:");
-        output(" [devices|deploy|install|uninstall|list|mc_install|mc_uninstall|mc_list]");
-        output("INFO:");
-        output(" https://github.com/kaala/mobiledevice");
-        exit(EXIT_FAILURE);
-    }
+	if (!arguments[@"command"]) {
+		output("CMD:");
+		output(" [devices|deploy|install|uninstall|list|mcinstall|mcuninstall|mclist]");
+		output("INFO:");
+		output(" https://github.com/kaala/mobiledevice");
+		exit(EXIT_FAILURE);
+	}
 
-    NSString *cmd=arguments[@"command"];
+	NSString *cmd = arguments[@"command"];
 
-    if ([cmd isEqualToString:@"devices"]) {
-        register_device_notification(DEVICE_DETECT_MODE);
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, NO);
-        unregister_device_notification();
+	if ([cmd isEqualToString:@"devices"]) {
+		register_device_notification(DEVICE_DETECT_MODE);
+		CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1, NO);
+		unregister_device_notification();
 
-        NSArray *udids=[devices allObjects];
-        NSString *o=[udids componentsJoinedByString:@"\n"];
-        output(o.UTF8String);
+		NSArray *udids = [devices allObjects];
+		NSString *o = [udids componentsJoinedByString:@"\n"];
+		output(o.UTF8String);
 
-        exit(EXIT_SUCCESS);
-    }
+		exit(EXIT_SUCCESS);
+	}
 
-    if ([cmd isEqualToString:@"deploy"]){
-        @try {
-            NSString *param=arguments[@"param"];
-            die(!!param,"!PARAM");
-        }
-        @catch (NSException *exception) {
-            NSString *o=[exception description];
-            output(o.UTF8String);
-            exit(EXIT_FAILURE);
-        }
+	if ([cmd isEqualToString:@"deploy"]) {
+		@try {
+			NSString *param = arguments[@"param"];
+			die(!!param, "!PARAM");
+		}
+		@catch (NSException *exception) {
+			NSString *o = [exception description];
+			output(o.UTF8String);
+			exit(EXIT_FAILURE);
+		}
 
-        deploy=[[NSOperationQueue alloc] init];
-        deploy.maxConcurrentOperationCount=5;
+		deploy = [[NSOperationQueue alloc] init];
+		deploy.maxConcurrentOperationCount = 10;
 
-        register_device_notification(MASS_DEPLOY_MODE);
-        CFRunLoopRun();
-        unregister_device_notification();
+		register_device_notification(MASS_DEPLOY_MODE);
+		CFRunLoopRun();
+		unregister_device_notification();
 
-        exit(EXIT_SUCCESS);
-    }
+		exit(EXIT_SUCCESS);
+	}
 
-    if (cmd){
-        register_device_notification(SINGLE_DEVICE_MODE);
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 5, NO);
-        unregister_device_notification();
+	if (cmd) {
+		register_device_notification(SINGLE_DEVICE_MODE);
+		CFRunLoopRunInMode(kCFRunLoopDefaultMode, 5, NO);
+		unregister_device_notification();
 
-        output("!DEVICE_NOT_FOUND");
-        exit(EXIT_FAILURE);
-    }
+		output("!DEVICE_NOT_FOUND");
+		exit(EXIT_FAILURE);
+	}
 }
 
-int main(int argc, const char * argv[]) {
-    NSMutableDictionary *parse=[NSMutableDictionary dictionary];
-    NSString *key=@"command";
-    for (int i=1; i<argc; i++) {
-        NSString *obj=[NSString stringWithUTF8String:argv[i]];
-        if ([obj hasPrefix:@"-"]) {
-            if ([obj isEqualToString:@"-v"] || [obj isEqualToString:@"-verbose"]) {
-                parse[@"verbose"]=@(YES);
-            }else if ([obj isEqualToString:@"-p"] || [obj isEqualToString:@"-preview"]){
-                parse[@"verbose"]=@(YES);
-                parse[@"preview"]=@(YES);
-            }else{
-                key=[obj substringFromIndex:1];
-            }
-        }else{
-            if (key) {
-                parse[key]=obj;
-                key=nil;
-            }else{
-                parse[@"param"]=obj;
-            }
-        }
-    }
-    parse_args(parse);
+int main(int argc, const char *argv[]) {
+    setvbuf(stdout, NULL, _IOLBF, _IONBF);
 
-    return EXIT_SUCCESS;
+	NSMutableDictionary *parse = [NSMutableDictionary dictionary];
+	NSString *key = @"command";
+	for (int i = 1; i < argc; i++) {
+		NSString *obj = [NSString stringWithUTF8String:argv[i]];
+		if ([obj hasPrefix:@"-"]) {
+			if ([obj isEqualToString:@"-v"] || [obj isEqualToString:@"-verbose"]) {
+				parse[@"verbose"] = @(YES);
+			} else if ([obj isEqualToString:@"-p"] || [obj isEqualToString:@"-preview"]) {
+				parse[@"verbose"] = @(YES);
+				parse[@"preview"] = @(YES);
+			} else {
+				key = [obj substringFromIndex:1];
+			}
+		} else {
+			if (key) {
+				parse[key] = obj;
+				key = nil;
+			} else {
+				parse[@"param"] = obj;
+			}
+		}
+	}
+	parse_args(parse);
+
+	return EXIT_SUCCESS;
 }
 
-void execute_on_device(struct am_device *device,NSString *cmd,NSString *param)
+void execute_on_device(struct am_device *device, NSString *cmd, NSString *param)
 {
-    die(!AMDeviceConnect(device),"!AMDeviceConnect");
-    die(AMDeviceIsPaired(device),"!AMDeviceIsPaired");
-    die(!AMDeviceValidatePairing(device),"!AMDeviceValidatePairing");
-    die(!AMDeviceStartSession(device),"!AMDeviceStartSession");
+	die(!AMDeviceConnect(device), "!AMDeviceConnect");
+	die(AMDeviceIsPaired(device), "!AMDeviceIsPaired");
+	die(!AMDeviceValidatePairing(device), "!AMDeviceValidatePairing");
+	die(!AMDeviceStartSession(device), "!AMDeviceStartSession");
 
-    NSException *e=exc("!COMMAND_NOT_FOUND");
-    @try {
-        if ([cmd isEqualToString:@"sleep"]) {
-            e=nil;
-            die(!!param,"!PARAM");
-            int seconds=[param intValue];
-            sleep(seconds);
-        }
+    cmd=[cmd stringByReplacingOccurrencesOfString:@"_" withString:@""];
+    cmd=[cmd lowercaseString];
 
-        if ([cmd isEqualToString:@"install"]) {
-            e=nil;
-            die(!!param,"!PARAM");
-            install_app(device, param);
+	NSException *e = exc("!COMMAND_NOT_FOUND");
+	@try {
+		if ([cmd isEqualToString:@"sleep"]) {
+			e = nil;
+			die(!!param, "!PARAM");
+			int seconds = [param intValue];
+			sleep(seconds);
+		}
+
+		if ([cmd isEqualToString:@"install"]) {
+			e = nil;
+			die(!!param, "!PARAM");
+			install_app(device, param);
+		}
+		if ([cmd isEqualToString:@"uninstall"]) {
+			e = nil;
+			die(!!param, "!PARAM");
+			uninstall_app(device, param);
+		}
+		if ([cmd isEqualToString:@"list"]) {
+			e = nil;
+			list_app(device);
+		}
+		if ([cmd isEqualToString:@"mcinstall"]) {
+			e = nil;
+			die(!!param, "!PARAM");
+			install_mc(device, param);
+		}
+		if ([cmd isEqualToString:@"mcuninstall"]) {
+			e = nil;
+			die(!!param, "!PARAM");
+			uninstall_mc(device, param);
+		}
+		if ([cmd isEqualToString:@"mclist"]) {
+			e = nil;
+			list_mc(device);
+		}
+        if ([cmd isEqualToString:@"shutdown"]) {
+            e = nil;
+            shutdown_device(device);
         }
-        if ([cmd isEqualToString:@"uninstall"]) {
-            e=nil;
-            die(!!param,"!PARAM");
-            uninstall_app(device, param);
-        }
-        if ([cmd isEqualToString:@"list"]) {
-            e=nil;
-            list_app(device);
-        }
-        if ([cmd isEqualToString:@"mc_install"]) {
-            e=nil;
-            die(!!param,"!PARAM");
-            install_mc(device, param);
-        }
-        if ([cmd isEqualToString:@"mc_uninstall"]) {
-            e=nil;
-            die(!!param,"!PARAM");
-            uninstall_mc(device, param);
-        }
-        if ([cmd isEqualToString:@"mc_list"]) {
-            e=nil;
-            list_mc(device);
-        }
-    }
-    @catch (NSException *exception) {
-        e=exception;
-    }
+	}
+	@catch (NSException *exception) {
+		e = exception;
+	}
+
+	die(!AMDeviceStopSession(device), "!AMDeviceStopSession");
+	die(!AMDeviceDisconnect(device), "!AMDeviceDisconnect");
+
     if (e) {
-        NSString *o=[e description];
+        NSString *o = [e description];
         die(0, o.UTF8String);
+    }else{
+        NSString *udid = get_udid(device);
+        NSString *o = [NSString stringWithFormat:@"%@ %@", udid, cmd.uppercaseString];
+        output(o.UTF8String);
     }
-
-    die(!AMDeviceStopSession(device),"!AMDeviceStopSession");
-    die(!AMDeviceDisconnect(device),"!AMDeviceDisconnect");
-
-    NSString *o=[NSString stringWithFormat:@"!OK %@",cmd.uppercaseString];
-    output(o.UTF8String);
 }
