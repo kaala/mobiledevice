@@ -32,36 +32,31 @@ enum {
 	MASS_DEPLOY_MODE
 };
 
-void output(const char *s)
-{
+void output(const char *s) {
 	if (s) {
 		printf("%s\n", s);
 	}
 }
 
-NSException *exc(const char *s)
-{
+NSException *exc(const char *s) {
 	NSString *str = [NSString stringWithUTF8String:s];
 	return [NSException exceptionWithName:NSGenericException reason:str userInfo:nil];
 }
 
-void die(int c, const char *s)
-{
+void die(int c, const char *s) {
 	if (!c) {
 		@throw exc(s);
 	}
 }
 
-int start_service(struct am_device *device, NSString *service)
-{
+int start_service(struct am_device *device, NSString *service) {
 	int sock = 0;
 	CFStringRef name = (__bridge CFStringRef)(service);
 	die(!AMDeviceStartService(device, name, &sock), "!AMDeviceStartService");
 	return sock;
 }
 
-BOOL socket_send_request(int service, NSData *message)
-{
+BOOL socket_send_request(int service, NSData *message) {
 	bool result = NO;
 	CFDataRef messageAsXML = (__bridge CFDataRef)(message);
 	if (messageAsXML) {
@@ -81,8 +76,7 @@ BOOL socket_send_request(int service, NSData *message)
 	}
 	return result;
 }
-NSData *socket_receive_response(int service)
-{
+NSData *socket_receive_response(int service) {
 	NSData *result = nil;
 	int sock = service;
 	uint32_t sz;
@@ -108,8 +102,7 @@ NSData *socket_receive_response(int service)
 	}
 	return result;
 }
-NSDictionary *socket_send_xml(int sock, NSDictionary *message)
-{
+NSDictionary *socket_send_xml(int sock, NSDictionary *message) {
 	NSDictionary *dict = nil;
 	NSData *recv = nil;
 	if (message) {
@@ -126,32 +119,28 @@ NSDictionary *socket_send_xml(int sock, NSDictionary *message)
 	return dict;
 }
 
-BOOL is_file_exist(NSString *path)
-{
+BOOL is_file_exist(NSString *path) {
 	BOOL dir = NO;
 	NSFileManager *fm = [NSFileManager defaultManager];
 	BOOL exist = [fm fileExistsAtPath:path isDirectory:&dir];
 	return exist;
 }
 
-NSString *read_file(NSString *path)
-{
+NSString *read_file(NSString *path) {
 	NSStringEncoding encoding = 0;
 	NSError *error = nil;
 	NSString *text = [NSString stringWithContentsOfFile:path usedEncoding:&encoding error:&error];
 	return text;
 }
 
-NSString *get_udid(struct am_device *device)
-{
+NSString *get_udid(struct am_device *device) {
 	CFStringRef identifier = AMDeviceCopyDeviceIdentifier(device);
 	NSString *udid = (__bridge NSString *)(identifier);
 	CFRelease(identifier);
 	return udid;
 }
 
-static void install_app(struct am_device *device, NSString *app_path)
-{
+static void install_app(struct am_device *device, NSString *app_path) {
 	@try {
 		die(is_file_exist(app_path), "!FILE_NOT_FOUND");
 		NSURL *file_url = [NSURL fileURLWithPath:app_path isDirectory:YES];
@@ -165,8 +154,7 @@ static void install_app(struct am_device *device, NSString *app_path)
 		@throw exception;
 	}
 }
-static void uninstall_app(struct am_device *device, NSString *app_id)
-{
+static void uninstall_app(struct am_device *device, NSString *app_id) {
 	@try {
 		CFStringRef bundle_id = (__bridge CFStringRef)(app_id);
 		die(!AMDeviceSecureUninstallApplication(0, device, bundle_id, 0, NULL, 0), "!AMDeviceSecureUninstallApplication");
@@ -175,8 +163,7 @@ static void uninstall_app(struct am_device *device, NSString *app_id)
 		@throw exception;
 	}
 }
-static void list_app(struct am_device *device)
-{
+static void list_app(struct am_device *device) {
 	@try {
 		CFDictionaryRef apps = NULL;
 		die(!AMDeviceLookupApplications(device, 0, &apps), "!AMDeviceLookupApplications\n");
@@ -215,8 +202,7 @@ static void list_app(struct am_device *device)
 	}
 }
 
-static void install_mc(struct am_device *device, NSString *mc_path)
-{
+static void install_mc(struct am_device *device, NSString *mc_path) {
 	@try {
 		die(is_file_exist(mc_path), "!FILE_NOT_FOUND");
 		int sock = start_service(device, @"com.apple.mobile.MCInstall");
@@ -232,8 +218,7 @@ static void install_mc(struct am_device *device, NSString *mc_path)
 		@throw exception;
 	}
 }
-static void uninstall_mc(struct am_device *device, NSString *mc_id)
-{
+static void uninstall_mc(struct am_device *device, NSString *mc_id) {
 	@try {
 		int sock = start_service(device, @"com.apple.mobile.MCInstall");
 		socket_send_xml(sock, @{ @"RequestType":@"Flush" });
@@ -247,8 +232,7 @@ static void uninstall_mc(struct am_device *device, NSString *mc_id)
 		@throw exception;
 	}
 }
-static void list_mc(struct am_device *device)
-{
+static void list_mc(struct am_device *device) {
 	@try {
 		int sock = start_service(device, @"com.apple.mobile.MCInstall");
 		socket_send_xml(sock, @{ @"RequestType":@"Flush" });
@@ -284,23 +268,21 @@ static void list_mc(struct am_device *device)
 	}
 }
 
-static void shutdown_device(struct am_device *device)
-{
-    @try {
-        int sock = start_service(device, @"com.apple.mobile.diagnostics_relay");
-        NSDictionary *dict = socket_send_xml(sock, @{ @"Request":@"Shutdown" });
-        if ([arguments[@"verbose"] boolValue]) {
-            NSString *o = [dict description];
-            output(o.UTF8String);
-        }
-    }
-    @catch (NSException *exception) {
-        @throw exception;
-    }
+static void shutdown_device(struct am_device *device) {
+	@try {
+		int sock = start_service(device, @"com.apple.mobile.diagnostics_relay");
+		NSDictionary *dict = socket_send_xml(sock, @{ @"Request":@"Shutdown" });
+		if ([arguments[@"verbose"] boolValue]) {
+			NSString *o = [dict description];
+			output(o.UTF8String);
+		}
+	}
+	@catch (NSException *exception) {
+		@throw exception;
+	}
 }
 
-void add_device_to_queue(struct am_device *device)
-{
+void add_device_to_queue(struct am_device *device) {
 	NSOperation *operate = [NSBlockOperation blockOperationWithBlock:^{
 	                            @try {
 	                                NSString *param = arguments[@"param"];
@@ -335,8 +317,7 @@ void add_device_to_queue(struct am_device *device)
 	[deploy addOperation:operate];
 }
 
-void on_device_connect(struct am_device *device, int cookie)
-{
+void on_device_connect(struct am_device *device, int cookie) {
 	if (cookie == MASS_DEPLOY_MODE) {
 		NSString *s = get_udid(device);
 		NSString *o = [NSString stringWithFormat:@"%@ CONNECT", s];
@@ -365,8 +346,7 @@ void on_device_connect(struct am_device *device, int cookie)
 		}
 	}
 }
-void on_device_disconnect(struct am_device *device, int cookie)
-{
+void on_device_disconnect(struct am_device *device, int cookie) {
 	if (cookie == MASS_DEPLOY_MODE) {
 		NSString *s = get_udid(device);
 		NSString *o = [NSString stringWithFormat:@"%@ DISCONNECT", s];
@@ -374,8 +354,7 @@ void on_device_disconnect(struct am_device *device, int cookie)
 	}
 }
 
-void on_device_notification(struct am_device_notification_callback_info *info, int cookie)
-{
+void on_device_notification(struct am_device_notification_callback_info *info, int cookie) {
 	struct am_device *device = info->dev;
 	if (AMDeviceGetInterfaceType(device) != AMDeviceInterfaceTypeUSB) {
 		return;
@@ -392,17 +371,14 @@ void on_device_notification(struct am_device_notification_callback_info *info, i
 	}
 }
 
-void register_device_notification(int cookie)
-{
+void register_device_notification(int cookie) {
 	AMDeviceNotificationSubscribe(&on_device_notification, 0, 0, cookie, &notification);
 }
-void unregister_device_notification()
-{
+void unregister_device_notification() {
 	AMDeviceNotificationUnsubscribe(notification);
 }
 
-void parse_args(NSDictionary *args)
-{
+void parse_args(NSDictionary *args) {
 	arguments = args;
 	devices = [NSMutableSet set];
 
@@ -469,7 +445,7 @@ void parse_args(NSDictionary *args)
 }
 
 int main(int argc, const char *argv[]) {
-    setvbuf(stdout, NULL, _IOLBF, _IONBF);
+	setvbuf(stdout, NULL, _IOLBF, _IONBF);
 
 	NSMutableDictionary *parse = [NSMutableDictionary dictionary];
 	NSString *key = @"command";
@@ -498,15 +474,14 @@ int main(int argc, const char *argv[]) {
 	return EXIT_SUCCESS;
 }
 
-void execute_on_device(struct am_device *device, NSString *cmd, NSString *param)
-{
+void execute_on_device(struct am_device *device, NSString *cmd, NSString *param) {
 	die(!AMDeviceConnect(device), "!AMDeviceConnect");
 	die(AMDeviceIsPaired(device), "!AMDeviceIsPaired");
 	die(!AMDeviceValidatePairing(device), "!AMDeviceValidatePairing");
 	die(!AMDeviceStartSession(device), "!AMDeviceStartSession");
 
-    cmd=[cmd stringByReplacingOccurrencesOfString:@"_" withString:@""];
-    cmd=[cmd lowercaseString];
+	cmd = [cmd stringByReplacingOccurrencesOfString:@"_" withString:@""];
+	cmd = [cmd lowercaseString];
 
 	NSException *e = exc("!COMMAND_NOT_FOUND");
 	@try {
@@ -545,10 +520,10 @@ void execute_on_device(struct am_device *device, NSString *cmd, NSString *param)
 			e = nil;
 			list_mc(device);
 		}
-        if ([cmd isEqualToString:@"shutdown"]) {
-            e = nil;
-            shutdown_device(device);
-        }
+		if ([cmd isEqualToString:@"shutdown"]) {
+			e = nil;
+			shutdown_device(device);
+		}
 	}
 	@catch (NSException *exception) {
 		e = exception;
@@ -557,12 +532,12 @@ void execute_on_device(struct am_device *device, NSString *cmd, NSString *param)
 	die(!AMDeviceStopSession(device), "!AMDeviceStopSession");
 	die(!AMDeviceDisconnect(device), "!AMDeviceDisconnect");
 
-    if (e) {
-        NSString *o = [e description];
-        die(0, o.UTF8String);
-    }else{
-        NSString *udid = get_udid(device);
-        NSString *o = [NSString stringWithFormat:@"%@ %@", udid, cmd.uppercaseString];
-        output(o.UTF8String);
-    }
+	if (e) {
+		NSString *o = [e description];
+		die(0, o.UTF8String);
+	} else {
+		NSString *udid = get_udid(device);
+		NSString *o = [NSString stringWithFormat:@"%@ %@", udid, cmd.uppercaseString];
+		output(o.UTF8String);
+	}
 }
