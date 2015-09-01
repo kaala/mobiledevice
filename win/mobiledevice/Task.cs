@@ -173,12 +173,12 @@ namespace mobiledevice
                         return;
                     }
 
-                    DirectoryInfo dir = fp.Directory;
-                    Directory.SetCurrentDirectory(dir.FullName);
-
                     string[] lines = File.ReadAllLines(param);
                     foreach ( string line in lines )
                     {
+                        string root = Directory.GetCurrentDirectory();
+                        DirectoryInfo dir = fp.Directory;
+                        Directory.SetCurrentDirectory(dir.FullName);
                         string[] rows = line.Split(' ');
                         if ( rows.Length != 2 )
                         {
@@ -188,6 +188,7 @@ namespace mobiledevice
                         string arg1 = rows[0] as string;
                         string arg2 = rows[1] as string;
                         subtask.Execute(arg1, arg2);
+                        Directory.SetCurrentDirectory(root);
                     }
                     break;
                 default:
