@@ -23,18 +23,10 @@ NSArray *ParseArgs(int argc,const char * argv[]){
 };
 
 void WriteLine(NSString *message){
-    NSFileHandle *fh=[NSFileHandle fileHandleWithStandardOutput];
-    message=[message stringByAppendingString:@"\n"];
-    NSData *data=[message dataUsingEncoding:NSUTF8StringEncoding];
-    [fh writeData:data];
-    [fh synchronizeFile];
+    fprintf(stdout, "%s\n",message.UTF8String);
 }
 void WriteError(NSString *message){
-    NSFileHandle *fh=[NSFileHandle fileHandleWithStandardError];
-    message=[message stringByAppendingString:@"\n"];
-    NSData *data=[message dataUsingEncoding:NSUTF8StringEncoding];
-    [fh writeData:data];
-    [fh synchronizeFile];
+    fprintf(stderr, "%s\n",message.UTF8String);
 }
 
 void ThreadSleep(int sec){

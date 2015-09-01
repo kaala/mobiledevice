@@ -16,6 +16,10 @@
 static NSDictionary *inArgs=nil;
 
 int main(int argc, const char * argv[]) {
+    setvbuf(stdout, NULL, _IOLBF, _IONBF);
+
+    WriteError(@"Running on macosx");
+    system("killall iTunesHelper 2>/dev/null");
 
     NSArray *args=ParseArgs(argc,argv);
 

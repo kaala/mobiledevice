@@ -156,14 +156,15 @@
             [self.device WriteLine:@"BatchExecute file"];
             return;
         }
-        NSString *dir=[param stringByDeletingLastPathComponent];
-        [[NSFileManager defaultManager] changeCurrentDirectoryPath:dir];
         NSStringEncoding enc=0;
         NSError *err=nil;
         NSString *contents=[NSString stringWithContentsOfFile:param usedEncoding:&enc error:&err];
         NSCharacterSet *nl=[NSCharacterSet newlineCharacterSet];
         NSArray *lines=[contents componentsSeparatedByCharactersInSet:nl];
         for (NSString *line in lines) {
+            NSString *root=[[NSFileManager defaultManager] currentDirectoryPath];
+            NSString *dir=[param stringByDeletingLastPathComponent];
+            [[NSFileManager defaultManager] changeCurrentDirectoryPath:dir];
             NSCharacterSet *sp=[NSCharacterSet whitespaceCharacterSet];
             NSArray *rows=[line componentsSeparatedByCharactersInSet:sp];
             if (rows.count!=2) {
@@ -174,6 +175,7 @@
             NSDictionary *args=@{@"command":arg1.lowercaseString,@"param":arg2};
             Task *subtask=[Task taskWithDevice:self.device];
             [subtask Execute:args];
+            [[NSFileManager defaultManager] changeCurrentDirectoryPath:root];
         }
         return;
     }
