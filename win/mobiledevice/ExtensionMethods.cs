@@ -6,7 +6,7 @@ namespace ExtensionMethods
     {
         public static object Find(this Dictionary<string, object> dict, string key)
         {
-            if (dict.ContainsKey(key))
+            if ( dict.ContainsKey(key) )
             {
                 return dict[key];
             }

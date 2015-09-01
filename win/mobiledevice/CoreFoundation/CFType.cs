@@ -43,28 +43,26 @@ namespace CoreFoundation
 
         private string CFString()
         {
-            if (typeRef == IntPtr.Zero)
+            if ( typeRef == IntPtr.Zero )
                 return null;
             int length = CFLibrary.CFStringGetLength(this);
             byte[] ch = new byte[length];
-            for (int i = 0; i < length; i++)
+            for ( int i = 0; i < length; i++ )
             {
                 ch[i] = CFLibrary.CFStringGetCharacterAtIndex(this, i);
             }
-            UTF8Encoding converter = new UTF8Encoding();
-            string str = converter.GetString(ch);
-            return str;
+            return Encoding.UTF8.GetString(ch);
         }
         private string CFNumber()
         {
             IntPtr buffer = Marshal.AllocCoTaskMem(CFLibrary.CFNumberGetByteSize(typeRef));
             bool scs = CFLibrary.CFNumberGetValue(typeRef, CFLibrary.CFNumberGetType(typeRef), buffer);
-            if (scs != true)
+            if ( scs != true )
             {
                 return string.Empty;
             }
             int type = (int)CFLibrary.CFNumberGetType(typeRef);
-            switch (type)
+            switch ( type )
             {
                 case 1:
                     return Marshal.ReadInt16(buffer).ToString();
@@ -93,11 +91,11 @@ namespace CoreFoundation
         }
         public override string ToString()
         {
-            if (typeRef == IntPtr.Zero)
+            if ( typeRef == IntPtr.Zero )
             {
                 return null;
             }
-            switch (CFLibrary.CFGetTypeID(typeRef))
+            switch ( CFLibrary.CFGetTypeID(typeRef) )
             {
                 case _CFString:
                     return CFString();

@@ -196,27 +196,21 @@ namespace mobiledevice
             Dictionary<string, object> received = TransferPlist(dict);
             Flush();
 
-            string ProfileMetadata = MobileDevice.ProfileMetadata;
-            string OrderedIdentifiers = MobileDevice.OrderedIdentifiers;
-            string PayloadDisplayName = MobileDevice.PayloadDisplayName;
-            string PayloadOrganization = MobileDevice.PayloadOrganization;
-            string PayloadIdentifier = MobileDevice.PayloadIdentifier;
-
-            List<object> keys = received[OrderedIdentifiers] as List<object>;
+            List<object> keys = received[MobileDevice.OrderedIdentifiers] as List<object>;
             int length = keys.Count;
-            Dictionary<string, object> metas = received[ProfileMetadata] as Dictionary<string, object>;
+            Dictionary<string, object> metas = received[MobileDevice.ProfileMetadata] as Dictionary<string, object>;
 
             Hashtable profiles = new Hashtable();
             for ( int i = 0; i < length; i++ )
             {
                 string identifier = keys[i] as string;
                 Dictionary<string, object> meta = metas[identifier] as Dictionary<string, object>;
-                string displayname = meta.Find(PayloadDisplayName) as string;
-                string organization = meta.Find(PayloadOrganization) as string;
+                string displayname = meta.Find(MobileDevice.PayloadDisplayName) as string;
+                string organization = meta.Find(MobileDevice.PayloadOrganization) as string;
                 Hashtable m = new Hashtable();
-                m.Add(PayloadIdentifier, identifier);
-                m.Add(PayloadDisplayName, displayname);
-                m.Add(PayloadOrganization, organization);
+                m.Add(MobileDevice.PayloadIdentifier, identifier);
+                m.Add(MobileDevice.PayloadDisplayName, displayname);
+                m.Add(MobileDevice.PayloadOrganization, organization);
                 profiles.Add(identifier, m);
             }
             return profiles;
@@ -224,20 +218,14 @@ namespace mobiledevice
 
         public void showProfiles(Hashtable profiles)
         {
-            string ProfileMetadata = MobileDevice.ProfileMetadata;
-            string OrderedIdentifiers = MobileDevice.OrderedIdentifiers;
-            string PayloadDisplayName = MobileDevice.PayloadDisplayName;
-            string PayloadOrganization = MobileDevice.PayloadOrganization;
-            string PayloadIdentifier = MobileDevice.PayloadIdentifier;
-
             foreach ( DictionaryEntry e in profiles )
             {
                 Hashtable app = e.Value as Hashtable;
-                Console.Out.Write(app[PayloadIdentifier]);
+                Console.Out.Write(app[MobileDevice.PayloadIdentifier]);
                 Console.Out.Write("\t");
-                Console.Out.Write(app[PayloadDisplayName]);
+                Console.Out.Write(app[MobileDevice.PayloadDisplayName]);
                 Console.Out.Write("(");
-                Console.Out.Write(app[PayloadOrganization]);
+                Console.Out.Write(app[MobileDevice.PayloadOrganization]);
                 Console.Out.Write(")");
                 Console.Out.Write("\n");
             }

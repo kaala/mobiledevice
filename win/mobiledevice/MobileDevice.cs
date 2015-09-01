@@ -328,10 +328,10 @@ namespace mobiledevice
         private static void usbMuxMode(ref AMDeviceNotificationCallbackInfo callback_info, uint cookie)
         {
             IntPtr devHandle = callback_info.dev;
-            
+
             if ( devHandle == IntPtr.Zero )
             {
-            	return;
+                return;
             }
 
             AMDevice dev = new AMDevice(devHandle);
