@@ -48,7 +48,7 @@
     if (success) {
         [self.device WriteLine:@"UninstallApp success"];
     }else{
-        [self.device WriteLine:@"UninstallApp success"];
+        [self.device WriteLine:@"UninstallApp fail"];
     }
 }
 
@@ -74,7 +74,7 @@
     if (success) {
         [self.device WriteLine:@"UninstallProfile success"];
     }else{
-        [self.device WriteLine:@"UninstallProfile success"];
+        [self.device WriteLine:@"UninstallProfile fail"];
     }
 }
 
@@ -92,7 +92,7 @@
     if (success) {
         [self.device WriteLine:@"Shutdown success"];
     }else{
-        [self.device WriteLine:@"Shutdown success"];
+        [self.device WriteLine:@"Shutdown fail"];
     }
 }
 -(void)SyncTime{
@@ -100,7 +100,7 @@
     if (success) {
         [self.device WriteLine:@"Sync success"];
     }else{
-        [self.device WriteLine:@"Sync success"];
+        [self.device WriteLine:@"Sync fail"];
     }
 }
 

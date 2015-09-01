@@ -33,6 +33,16 @@ extern const NSString *CFBundleVersion;
 @class AMDevice;
 
 
+__DLLIMPORT uint32_t AMDeviceGetInterfaceType(struct am_device *device);
+
+__DLLIMPORT CFStringRef AMDeviceSetValue(struct am_device *device, CFStringRef domain, CFStringRef cfstring,CFTypeRef cfvalue);
+
+enum {
+    AMDeviceInterfaceTypeUSB = 1,
+    AMDeviceInterfaceTypeWifi = 2
+};
+
+
 BOOL Connect(AMDevice *device);
 BOOL Disconnect(AMDevice *device);
 BOOL ValidatePairing(AMDevice *device);

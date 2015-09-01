@@ -130,13 +130,6 @@ void ShowProfiles(NSDictionary *profiles){
 
 extern BOOL OnDeviceAttached(AMDevice *device);
 
-__DLLIMPORT uint32_t AMDeviceGetInterfaceType(struct am_device *device);
-
-enum {
-    AMDeviceInterfaceTypeUSB = 1,
-    AMDeviceInterfaceTypeWifi = 2
-};
-
 static void usbMuxMode(struct am_device_notification_callback_info *info,int cookie){
     struct am_device *dev=info->dev;
 

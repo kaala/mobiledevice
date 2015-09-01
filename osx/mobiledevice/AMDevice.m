@@ -149,7 +149,7 @@
         return false;
     }
     NSTimeInterval tk=[[NSDate date] timeIntervalSince1970];
-    NSDictionary *dict=@{ @"Request":@"SetValue", @"Domain":@"", @"Key":@"TimeIntervalSince1970", @"Value":@(tk) };
+    NSDictionary *dict=@{ @"Request":@"SetValue", @"Domain":@(0), @"Key":@"TimeIntervalSince1970", @"Value":@(tk) };
     NSDictionary *received=[self TransferPlist:dict];
     NSString *status=[NSString stringWithFormat:@"%@",received[@"Status"]];
     [self Flush];
