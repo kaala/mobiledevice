@@ -20,11 +20,7 @@ class Program
         if ( args.Length == 1 )
         {
             string file = args[0] as string;
-            FileInfo fp = new FileInfo(file);
-            if ( fp.Exists )
-            {
-                args = new string[] { "deploy", file };
-            }
+            args = new string[] { "deploy", file };
         }
 
         // 用法说明
@@ -33,7 +29,7 @@ class Program
             Console.Error.WriteLine("available commands: list | deploy | install | uninstall | mcinstall | mcuninstall");
             Console.Error.WriteLine(string.Join(" ", args));
             Thread.Sleep(3000);
-            return 0;
+            return 1;
         }
 
         // 参数解析
@@ -42,6 +38,17 @@ class Program
         string param = args[1] as string;
         Program.inArgs.Add("command", cmd.ToLower());
         Program.inArgs.Add("param", param);
+
+        if ( cmd == "deploy" )
+        {
+            FileInfo fp = new FileInfo(param);
+            if ( fp.Exists )
+            {
+                Console.Error.WriteLine("BatchExecute file");
+                Thread.Sleep(3000);
+                return 1;
+            }
+        }
 
         // 调整设备连接通知持续时间
         // TODO: Thread结束会强制终止程序，强制timeout=-1
