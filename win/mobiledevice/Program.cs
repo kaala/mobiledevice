@@ -42,7 +42,7 @@ class Program
         if ( cmd == "deploy" )
         {
             FileInfo fp = new FileInfo(param);
-            if ( fp.Exists )
+            if ( !fp.Exists )
             {
                 Console.Error.WriteLine("BatchExecute file");
                 Thread.Sleep(3000);
