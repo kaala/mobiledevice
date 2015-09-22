@@ -18,16 +18,14 @@ static NSDictionary *inArgs=nil;
 int main(int argc, const char * argv[]) {
     setvbuf(stdout, NULL, _IOLBF, _IONBF);
 
-    WriteError(@"Running on macosx");
+    WriteError(@"Running on mac");
     system("killall iTunesHelper 2>/dev/null");
 
     NSArray *args=ParseArgs(argc,argv);
 
     if (args.count==1) {
         NSString *fp=args[0];
-        if (IsFileExists(fp)) {
-            args=@[@"deploy",fp];
-        }
+        args=@[@"deploy",fp];
     }
 
     if (args.count!=2) {
@@ -41,6 +39,14 @@ int main(int argc, const char * argv[]) {
     NSString *param=args[1];
     NSDictionary *dict=@{@"command":cmd.lowercaseString,@"param":param};
     inArgs=dict;
+
+    if ([cmd isEqual:@"deploy"]) {
+        if (!IsFileExists(param)) {
+            WriteError(@"BatchExecute file");
+            ThreadSleep(3);
+            return EXIT_FAILURE;
+        }
+    }
 
     int timeout=5;
     if ([cmd isEqual:@"deploy"]) {
