@@ -79,6 +79,7 @@ BOOL Run(AMDevice *device){
         }
         if (![device ValidatePairing]) {
             [device WriteLine:@"Pairing error"];
+            [device Disconnect];
             return false;
         }
         if (![device StartSession]) {

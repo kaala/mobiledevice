@@ -8,6 +8,7 @@ class Program
 {
 
     static Hashtable inArgs = null;
+    static int task = 0;
 
     public static int Main(string[] args)
     {
@@ -51,62 +52,85 @@ class Program
         }
 
         // 调整设备连接通知持续时间
-        // TODO: Thread结束会强制终止程序，强制timeout=-1
-        int timeout = -1;
+        int timeout = 5000;
         if ( cmd.Equals("deploy") )
         {
             timeout = -1;
         }
+
+        ThreadPool.SetMaxThreads(5, 5);
+
         MobileDevice.InitDeviceAttachListener(timeout);
 
+        while ( task > 0 )
+        {
+            Thread.Sleep(1000);
+        }
         return 0;
     }
 
     public static bool OnDeviceAttached(AMDevice device)
     {
-        // 捕捉所有异常
+        WaitCallback waitCallback = new WaitCallback(WorkItem);
+        ThreadPool.QueueUserWorkItem(waitCallback, device);
+        return true;
+    }
+
+    public static void WorkItem(object state)
+    {
+        task++;
+        AMDevice device = state as AMDevice;
+        Run(device);
+        task--;
+    }
+
+    public static bool Run(AMDevice device)
+    {
         try
         {
-            return Run(device);
+            if ( !device.Connect() )
+            {
+                device.WriteLine("Connect error");
+                return false;
+            }
+            if ( !device.ValidatePairing() )
+            {
+                Thread.Sleep(15);
+            }
+            if ( !device.ValidatePairing() )
+            {
+                Thread.Sleep(15);
+            }
+            if ( !device.ValidatePairing() )
+            {
+                device.WriteLine("Pairing error");
+                device.Disconnect();
+                return false;
+            }
+            if ( !device.StartSession() )
+            {
+                device.WriteLine("Session error");
+                device.Disconnect();
+                return false;
+            }
+
+            Hashtable args = Program.inArgs;
+            string ca = args["command"] as string;
+            string pa = args["param"] as string;
+            Task task = new Task(device);
+            task.Execute(ca, pa);
+
+            device.StopSession();
+            device.Disconnect();
+
+            device.WriteLine("Execute success");
+            return true;
         }
         catch ( Exception e )
         {
             device.WriteLine(e.Message);
             return false;
         }
-    }
-
-    public static bool Run(AMDevice device)
-    {
-        if ( !device.Connect() )
-        {
-            device.WriteLine("Connect error");
-            return false;
-        }
-        if ( !device.ValidatePairing() )
-        {
-            device.WriteLine("Pairing error");
-            device.Disconnect();
-            return false;
-        }
-        if ( !device.StartSession() )
-        {
-            device.WriteLine("Session error");
-            device.Disconnect();
-            return false;
-        }
-
-        Hashtable args = Program.inArgs;
-        string ca = args["command"] as string;
-        string pa = args["param"] as string;
-        Task task = new Task(device);
-        task.Execute(ca, pa);
-
-        device.StopSession();
-        device.Disconnect();
-
-        device.WriteLine("Execute success");
-        return true;
     }
 }
 
