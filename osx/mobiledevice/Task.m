@@ -135,7 +135,7 @@
     }
     if ([cmd isEqual:@"sleep"]) {
         int sec=param.intValue;
-        ThreadSleep(sec);
+        sleep(sec);
         return;
     }
     if ([cmd isEqual:@"sync"]) {

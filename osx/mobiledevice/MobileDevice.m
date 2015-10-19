@@ -157,6 +157,10 @@ void InitDeviceAttachListener(int sec){
     struct am_device_notification *notification = NULL;
 
     AMDeviceNotificationSubscribe(usbMuxMode, 0, 0, 0, &notification);
-    ThreadSleep(sec);
+    if (sec==-1) {
+        CFRunLoopRun();
+    }else{
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, sec, NO);
+    }
     AMDeviceNotificationUnsubscribe(notification);
 }

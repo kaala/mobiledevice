@@ -28,12 +28,3 @@ void WriteLine(NSString *message){
 void WriteError(NSString *message){
     fprintf(stderr, "%s\n",message.UTF8String);
 }
-
-void ThreadSleep(int sec){
-    if (sec==-1) {
-        CFRunLoopRun();
-    }else{
-        CFRunLoopRunInMode(kCFRunLoopDefaultMode, sec, NO);
-    }
-}
-

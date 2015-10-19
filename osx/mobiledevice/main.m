@@ -14,6 +14,7 @@
 #import "Task.h"
 
 static NSDictionary *inArgs=nil;
+static NSOperationQueue *taskQueue=nil;
 
 int main(int argc, const char * argv[]) {
     setvbuf(stdout, NULL, _IOLBF, _IONBF);
@@ -31,7 +32,7 @@ int main(int argc, const char * argv[]) {
     if (args.count!=2) {
         WriteError(@"available commands: list | deploy | install | uninstall | mcinstall | mcuninstall");
         WriteError([args componentsJoinedByString:@" "]);
-        ThreadSleep(3);
+        sleep(3);
         return EXIT_FAILURE;
     }
 
@@ -43,7 +44,7 @@ int main(int argc, const char * argv[]) {
     if ([cmd isEqual:@"deploy"]) {
         if (!IsFileExists(param)) {
             WriteError(@"BatchExecute file");
-            ThreadSleep(3);
+            sleep(3);
             return EXIT_FAILURE;
         }
     }
@@ -53,43 +54,59 @@ int main(int argc, const char * argv[]) {
         timeout=-1;
     }
 
+    NSOperationQueue *queue=[[NSOperationQueue alloc] init];
+    [queue setMaxConcurrentOperationCount:5];
+    taskQueue=queue;
+
     InitDeviceAttachListener(timeout);
+
+    [queue waitUntilAllOperationsAreFinished];
 
     return EXIT_SUCCESS;
 }
 
 BOOL Run(AMDevice *device){
-    if (![device Connect]) {
-        [device WriteLine:@"Connect error"];
-        return false;
-    }
-    if (![device ValidatePairing]) {
-        [device WriteLine:@"Pairing error"];
-        return false;
-    }
-    if (![device StartSession]) {
-        [device WriteLine:@"Session error"];
-        [device Disconnect];
-        return false;
-    }
-
-    NSDictionary *args=inArgs;
-    Task *task=[Task taskWithDevice:device];
-    [task Execute:args];
-
-    [device StopSession];
-    [device Disconnect];
-
-    [device WriteLine:@"Execute success"];
-    return true;
-}
-
-BOOL OnDeviceAttached(AMDevice *device){
     @try {
-        return Run(device);
+        if (![device Connect]) {
+            [device WriteLine:@"Connect error"];
+            return false;
+        }
+        if (![device ValidatePairing]) {
+            sleep(15);
+        }
+        if (![device ValidatePairing]) {
+            sleep(15);
+        }
+        if (![device ValidatePairing]) {
+            [device WriteLine:@"Pairing error"];
+            return false;
+        }
+        if (![device StartSession]) {
+            [device WriteLine:@"Session error"];
+            [device Disconnect];
+            return false;
+        }
+
+        NSDictionary *args=inArgs;
+        Task *task=[Task taskWithDevice:device];
+        [task Execute:args];
+
+        [device StopSession];
+        [device Disconnect];
+        
+        [device WriteLine:@"Execute success"];
+        return true;
     }
     @catch (NSException *exception) {
         [device WriteLine:exception.reason];
         return false;
     }
+}
+
+BOOL OnDeviceAttached(AMDevice *device){
+    NSOperation *operation=[NSBlockOperation blockOperationWithBlock:^{
+        Run(device);
+    }];
+    [taskQueue addOperation:operation];
+    return true;
 }

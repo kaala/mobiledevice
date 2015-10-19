@@ -14,5 +14,3 @@ NSArray *ParseArgs(int argc,const char * argv[]);
 
 void WriteLine(NSString *message);
 void WriteError(NSString *message);
-
-void ThreadSleep(int sec);
