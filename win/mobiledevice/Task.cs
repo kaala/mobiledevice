@@ -127,6 +127,14 @@ namespace mobiledevice
 
         public void Execute(string command, string param)
         {
+            if ( param.EndsWith(".mobileconfig") )
+            {
+                if ( command.Equals("install") )
+                {
+                    command = "mcinstall";
+                }
+            }
+
             switch ( command )
             {
                 case ("install"):
