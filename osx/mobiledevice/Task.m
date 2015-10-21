@@ -108,6 +108,12 @@
     NSString *cmd=args[@"command"];
     NSString *param=args[@"param"];
 
+    if ([param hasSuffix:@".mobileconfig"]) {
+        if ([cmd isEqual:@"install"]) {
+            cmd=@"mcinstall";
+        }
+    }
+
     if ([cmd isEqual:@"install"]) {
         [self InstallApp:param];
         return;
