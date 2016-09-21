@@ -1,13 +1,10 @@
 #!/bin/bash
 
-if [[ ! -d "zh_CN.lproj" ]]; then
-	mkdir zh_CN.lproj
-	echo 'CFBundleDisplayName = "装机工具";' >zh_CN.lproj/InfoPlist.strings
-	echo 'generate zh_CN.lproj/InfoPlist.strings'
-fi
+workdir=`dirname "$0"`
+pushd "$workdir"
 
-ROOT=`dirname "$0"`
-PATH="$ROOT":$PATH
+scriptfile=`osascript -e 'posix path of ( choose file default location ( path to desktop ) )'`
+test "$scriptfile" || exit 1
 
-EXECUTE_FROM_APP_BUNDLE=1
-./deviceprepare.tool
+killall iTunesHelper
+./mobiledevice deploy dhh.txt

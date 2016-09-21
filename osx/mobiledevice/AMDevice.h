@@ -8,38 +8,39 @@
 
 #import <Foundation/Foundation.h>
 
-#import "itunes.h"
+#import "Framework.h"
 
 @interface AMDevice : NSObject
 
-@property (nonatomic)  struct am_device *device;
-@property (nonatomic) int socket_fd;
-@property (nonatomic) NSString *device_id;
+@property(nonatomic) struct am_device *device;
+@property(nonatomic) int socket_fd;
+@property(nonatomic) NSString *device_id;
 
-+(AMDevice *)deviceWithHandle:(struct am_device *)device;
--(void)WriteLine:(NSString *)message;
++ (AMDevice *)deviceWithHandle:(struct am_device *)device;
+- (void)WriteLine:(NSString *)message;
 
--(NSString*)deviceId;
+- (NSString *)deviceId;
 
--(BOOL)Connect;
--(BOOL)Disconnect;
--(BOOL)ValidatePairing;
--(BOOL)StartSession;
--(BOOL)StopSession;
+- (BOOL)Connect;
+- (BOOL)Disconnect;
+- (BOOL)ValidatePairing;
+- (BOOL)StartSession;
+- (BOOL)StopSession;
 
--(BOOL)StartService:(const NSString *)serviceName;
--(NSDictionary *)TransferPlist:(NSDictionary *)dict;
--(BOOL)Flush;
+- (BOOL)StartService:(const NSString *)serviceName;
+- (NSDictionary *)TransferPlist:(NSDictionary *)dict;
+- (BOOL)Flush;
 
--(NSDictionary *)LookupApps;
--(BOOL)InstallApp:(NSString *)appPath;
--(BOOL)UninstallApp:(NSString *)appId;
+- (NSDictionary *)LookupApps;
+- (BOOL)InstallApp:(NSString *)appPath;
+- (BOOL)UninstallApp:(NSString *)appId;
 
--(NSDictionary *)LookupProfiles;
--(BOOL)InstallProfile:(NSString *)profilePath;
--(BOOL)UninstallProfile:(NSString *)profileId;
+- (NSDictionary *)LookupProfiles;
+- (BOOL)InstallProfile:(NSString *)profilePath;
+- (BOOL)UninstallProfile:(NSString *)profileId;
 
--(BOOL)Shutdown;
--(BOOL)UpdateTime;
+- (BOOL)CopyFile:(NSString *)map;
+- (BOOL)Shutdown;
+- (BOOL)SyncTime;
 
 @end

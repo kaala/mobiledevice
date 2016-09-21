@@ -8,9 +8,8 @@
 
 #import <Foundation/Foundation.h>
 
-
 BOOL IsFileExists(NSString *fp);
-NSArray *ParseArgs(int argc,const char * argv[]);
+NSArray *ParseArgs(int argc, const char *argv[]);
 
 void WriteLine(NSString *message);
 void WriteError(NSString *message);

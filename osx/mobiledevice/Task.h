@@ -12,8 +12,8 @@
 
 @interface Task : NSObject
 
-+(Task*)taskWithDevice:(AMDevice *)device;
++ (Task *)taskWithDevice:(AMDevice *)device;
 
--(void)Execute:(NSDictionary *)args;
+- (void)Run:(NSDictionary *)args;
 
 @end

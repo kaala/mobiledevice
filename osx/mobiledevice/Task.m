@@ -8,109 +8,117 @@
 
 #import "Task.h"
 
+#import "AMDevice.h"
 #import "CoreFoundation.h"
 #import "MobileDevice.h"
-#import "AMDevice.h"
 
 @interface Task ()
 
-@property(nonatomic,strong)AMDevice *device;
+@property(nonatomic, strong) AMDevice *device;
 
 @end
 
 @implementation Task
 
-+(Task*)taskWithDevice:(AMDevice *)device{
-    Task *task=[[Task alloc] init];
-    task.device=device;
++ (Task *)taskWithDevice:(AMDevice *)device {
+    Task *task = [[Task alloc] init];
+    task.device = device;
     return task;
 }
 
--(void)InstallApp:(NSString*)appPath{
+- (void)InstallApp:(NSString *)appPath {
     if (!IsFileExists(appPath)) {
-        [self.device WriteLine:@"InstallApp file"];
+        [self.device WriteLine:@"InstallApp NoFile"];
         return;
     }
-    BOOL success=[self.device InstallApp:appPath];
+    BOOL success = [self.device InstallApp:appPath];
     if (success) {
-        [self.device WriteLine:@"InstallApp success"];
-    }else{
-        [self.device WriteLine:@"InstallApp fail"];
+        [self.device WriteLine:@"InstallApp Ok"];
+    } else {
+        [self.device WriteLine:@"InstallApp Error"];
     }
 }
--(void)UninstallApp:(NSString*)appId{
-    NSDictionary *apps=[self.device LookupApps];
+- (void)UninstallApp:(NSString *)appId {
+    NSDictionary *apps = [self.device LookupApps];
     if (!apps[appId]) {
-        [self.device WriteLine:@"UninstallApp skip"];
+        [self.device WriteLine:@"UninstallApp Skip"];
         return;
     }
-    BOOL success=[self.device UninstallApp:appId];
+    BOOL success = [self.device UninstallApp:appId];
     if (success) {
-        [self.device WriteLine:@"UninstallApp success"];
-    }else{
-        [self.device WriteLine:@"UninstallApp fail"];
+        [self.device WriteLine:@"UninstallApp Ok"];
+    } else {
+        [self.device WriteLine:@"UninstallApp Error"];
     }
 }
 
--(void)InstallProfile:(NSString*)profilePath{
+- (void)InstallProfile:(NSString *)profilePath {
     if (!IsFileExists(profilePath)) {
-        [self.device WriteLine:@"InstallProfile file"];
+        [self.device WriteLine:@"InstallProfile NoFile"];
         return;
     }
-    BOOL success=[self.device InstallProfile:profilePath];
+    BOOL success = [self.device InstallProfile:profilePath];
     if (success) {
-        [self.device WriteLine:@"InstallProfile success"];
-    }else{
-        [self.device WriteLine:@"InstallProfile fail"];
+        [self.device WriteLine:@"InstallProfile Ok"];
+    } else {
+        [self.device WriteLine:@"InstallProfile Error"];
     }
 }
--(void)UninstallProfile:(NSString*)profileId{
-    NSDictionary *profiles=[self.device LookupProfiles];
+- (void)UninstallProfile:(NSString *)profileId {
+    NSDictionary *profiles = [self.device LookupProfiles];
     if (!profiles[profileId]) {
-        [self.device WriteLine:@"UninstallProfile skip"];
+        [self.device WriteLine:@"UninstallProfile Skip"];
         return;
     }
-    BOOL success=[self.device UninstallProfile:profileId];
+    BOOL success = [self.device UninstallProfile:profileId];
     if (success) {
-        [self.device WriteLine:@"UninstallProfile success"];
-    }else{
-        [self.device WriteLine:@"UninstallProfile fail"];
+        [self.device WriteLine:@"UninstallProfile Ok"];
+    } else {
+        [self.device WriteLine:@"UninstallProfile Error"];
     }
 }
 
--(void)ListApps{
-    NSDictionary *apps=[self.device LookupApps];
+- (void)ListApps {
+    NSDictionary *apps = [self.device LookupApps];
     ShowApps(apps);
 }
--(void)ListProfiles{
-    NSDictionary *profiles=[self.device LookupProfiles];
+- (void)ListProfiles {
+    NSDictionary *profiles = [self.device LookupProfiles];
     ShowProfiles(profiles);
 }
 
--(void)Shutdown{
-    BOOL success=[self.device Shutdown];
+- (void)Shutdown {
+    BOOL success = [self.device Shutdown];
     if (success) {
-        [self.device WriteLine:@"Shutdown success"];
-    }else{
-        [self.device WriteLine:@"Shutdown fail"];
+        [self.device WriteLine:@"Shutdown Ok"];
+    } else {
+        [self.device WriteLine:@"Shutdown Error"];
     }
 }
--(void)SyncTime{
-    BOOL success=[self.device UpdateTime];
+- (void)CopyFile:(NSString *)copy {
+    BOOL success = [self.device CopyFile:copy];
     if (success) {
-        [self.device WriteLine:@"Sync success"];
-    }else{
-        [self.device WriteLine:@"Sync fail"];
+        [self.device WriteLine:@"CopyFile Ok"];
+    } else {
+        [self.device WriteLine:@"CopyFile Error"];
+    }
+}
+- (void)SyncTime {
+    BOOL success = [self.device SyncTime];
+    if (success) {
+        [self.device WriteLine:@"Sync Ok"];
+    } else {
+        [self.device WriteLine:@"Sync Error"];
     }
 }
 
--(void)Execute:(NSDictionary *)args{
-    NSString *cmd=args[@"command"];
-    NSString *param=args[@"param"];
+- (void)Run:(NSDictionary *)args {
+    NSString *cmd = args[@"command"];
+    NSString *param = args[@"param"];
 
     if ([param hasSuffix:@".mobileconfig"]) {
         if ([cmd isEqual:@"install"]) {
-            cmd=@"mcinstall";
+            cmd = @"mcinstall";
         }
     }
 
@@ -140,12 +148,18 @@
         return;
     }
     if ([cmd isEqual:@"sleep"]) {
-        int sec=param.intValue;
+        int sec = param.intValue;
         sleep(sec);
         return;
     }
+    if ([cmd isEqual:@"copy"]) {
+        [self CopyFile:param];
+        return;
+    }
     if ([cmd isEqual:@"sync"]) {
-        [self SyncTime];
+        if ([param isEqual:@"time"]) {
+            [self SyncTime];
+        }
         return;
     }
     if ([cmd isEqual:@"list"]) {
@@ -159,34 +173,34 @@
     }
     if ([cmd isEqual:@"deploy"]) {
         if (!IsFileExists(param)) {
-            [self.device WriteLine:@"BatchExecute file"];
+            [self.device WriteLine:@"BatchExec NoFile"];
             return;
         }
-        NSStringEncoding enc=0;
-        NSError *err=nil;
-        NSString *contents=[NSString stringWithContentsOfFile:param usedEncoding:&enc error:&err];
-        NSCharacterSet *nl=[NSCharacterSet newlineCharacterSet];
-        NSArray *lines=[contents componentsSeparatedByCharactersInSet:nl];
+        NSStringEncoding enc = 0;
+        NSError *err = nil;
+        NSString *contents = [NSString stringWithContentsOfFile:param usedEncoding:&enc error:&err];
+        NSCharacterSet *nl = [NSCharacterSet newlineCharacterSet];
+        NSArray *lines = [contents componentsSeparatedByCharactersInSet:nl];
         for (NSString *line in lines) {
-            NSString *root=[[NSFileManager defaultManager] currentDirectoryPath];
-            NSString *dir=[param stringByDeletingLastPathComponent];
+            NSString *root = [[NSFileManager defaultManager] currentDirectoryPath];
+            NSString *dir = [param stringByDeletingLastPathComponent];
             [[NSFileManager defaultManager] changeCurrentDirectoryPath:dir];
-            NSCharacterSet *sp=[NSCharacterSet whitespaceCharacterSet];
-            NSArray *rows=[line componentsSeparatedByCharactersInSet:sp];
-            if (rows.count!=2) {
+            NSCharacterSet *sp = [NSCharacterSet whitespaceCharacterSet];
+            NSArray *rows = [line componentsSeparatedByCharactersInSet:sp];
+            if (rows.count != 2) {
                 continue;
             }
-            NSString *arg1=rows[0];
-            NSString *arg2=rows[1];
-            NSDictionary *args=@{@"command":arg1.lowercaseString,@"param":arg2};
-            Task *subtask=[Task taskWithDevice:self.device];
-            [subtask Execute:args];
+            NSString *arg1 = rows[0];
+            NSString *arg2 = rows[1];
+            NSDictionary *args = @{ @"command" : arg1.lowercaseString, @"param" : arg2 };
+            Task *subtask = [Task taskWithDevice:self.device];
+            [subtask Run:args];
             [[NSFileManager defaultManager] changeCurrentDirectoryPath:root];
         }
         return;
     }
 
-    NSString *msg=[NSString stringWithFormat:@"NoExecute %@",cmd];
+    NSString *msg = [NSString stringWithFormat:@"NotAvailable %@", cmd];
     [self.device WriteLine:msg];
 }
 
