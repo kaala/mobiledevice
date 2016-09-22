@@ -9,5 +9,8 @@ test "$scriptfile" || exit 1
 cat "$scriptfile"
 read -p "Press [Enter] to continue or [Ctrl-C] to cancel: "
 
+defaults -currentHost write com.apple.ImageCapture disableHotPlug -bool YES
+killall Photos
 killall iTunesHelper
+
 ./mobiledevice deploy "$scriptfile"
